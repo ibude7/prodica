@@ -1,0 +1,11 @@
+# https://render.com/docs/blueprint-spec
+# Connect this repo in the Render dashboard → New Blueprint Instance, or create a Web Service with these commands.
+services:
+  - type: web
+    name: prodica
+    runtime: node
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
