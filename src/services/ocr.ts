@@ -2,45 +2,46 @@ import type { PipelineStep } from '../domain/types'
 
 export interface OcrResult {
   text: string
+  /** 0–1 heuristic quality for downstream matching */
   quality: number
 }
 
-/** Stub — replace with Tesseract.js or cloud OCR */
-export async function runOcr(
-  _blob: Blob,
-  fingerprint: string,
-): Promise<{ result: OcrResult; step: PipelineStep }> {
-  await delay(150 + (Number.parseInt(fingerprint.slice(2, 4), 16) % 100))
+/**
+ * Real OCR via Tesseract.js (English). Slow on first run (loads trained data).
+ */
+export async function runOcr(blob: Blob): Promise<{ result: OcrResult; step: PipelineStep }> {
+  const { createWorker } = await import('tesseract.js')
+  const url = URL.createObjectURL(blob)
+  try {
+    const worker = await createWorker('eng')
+    const { data } = await worker.recognize(url)
+    await worker.terminate()
 
-  const mod = Number.parseInt(fingerprint.slice(0, 8), 16) % 7
-  let text = ''
-  let quality = 0.35
+    const text = data.text.replace(/\s+/g, ' ').trim()
+    const conf = typeof data.confidence === 'number' ? data.confidence : 0
+    const quality =
+      text.length < 4
+        ? 0.1
+        : Math.min(0.95, Math.max(0.2, conf / 100 + Math.min(0.15, text.length / 500)))
 
-  if (mod === 2) {
-    text = 'Château de Lumière Bordeaux Supérieur — Product of France'
-    quality = 0.88
-  } else if (mod === 3) {
-    text = 'Crunchy Oats Honey Bar Morning Trail'
-    quality = 0.62
-  } else if (mod === 4) {
-    text = 'blurry label text fragment...'
-    quality = 0.28
-  } else if (mod === 5) {
-    text = ''
-    quality = 0.1
+    const step: PipelineStep = {
+      step: 'ocr',
+      outcome:
+        text.length > 0
+          ? `OCR read ${text.length} characters (Tesseract, ~${Math.round(conf)}% confidence)`
+          : 'OCR found little readable text on this image',
+    }
+
+    return { result: { text, quality }, step }
+  } catch (e) {
+    return {
+      result: { text: '', quality: 0.1 },
+      step: {
+        step: 'ocr',
+        outcome: `OCR failed: ${e instanceof Error ? e.message : String(e)}`,
+      },
+    }
+  } finally {
+    URL.revokeObjectURL(url)
   }
-
-  const step: PipelineStep = {
-    step: 'ocr',
-    outcome:
-      text.length > 0
-        ? `OCR extracted ${text.length} characters (mock)`
-        : 'OCR produced little usable text (mock)',
-  }
-
-  return { result: { text, quality }, step }
-}
-
-function delay(ms: number): Promise<void> {
-  return new Promise((r) => setTimeout(r, ms))
 }

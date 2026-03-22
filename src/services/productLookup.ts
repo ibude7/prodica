@@ -52,7 +52,7 @@ export function lookupProduct(request: LookupRequest): ProductResult | null {
       }
       if (score > (best?.score ?? 0)) best = { row, score }
     }
-    if (best && best.score >= 3) {
+    if (best && best.score >= 10) {
       const conf = scoreConfidence({
         request,
         matchScore: Math.min(0.92, 0.45 + best.score * 0.08),
@@ -67,22 +67,5 @@ export function lookupProduct(request: LookupRequest): ProductResult | null {
     return null
   }
 
-  const label = request.label.toLowerCase()
-  for (const row of CATALOG) {
-    for (const vl of row.visualLabels) {
-      if (label.includes(vl) || vl.includes(label)) {
-        const conf = scoreConfidence({
-          request,
-          matchScore: 0.72,
-        })
-        return catalogToProductResult(row, {
-          source: 'visual',
-          baseProvenance: 'confirmed',
-          confidence: conf,
-          scanNotes: 'Matched via visual classification label (mock).',
-        })
-      }
-    }
-  }
   return null
 }

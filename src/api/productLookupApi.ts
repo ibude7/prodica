@@ -1,5 +1,9 @@
 import type { LookupRequest, ProductResult } from '../domain/types'
 import { lookupProduct } from '../services/productLookup'
+import {
+  lookupOpenFoodFactsByBarcode,
+  searchOpenFoodFactsByText,
+} from '../services/openFoodFacts'
 
 function resolveLookupUrl(): string {
   const base = import.meta.env.VITE_API_BASE
@@ -32,6 +36,13 @@ export async function fetchProductLookup(
     const data = (await res.json()) as { product: ProductResult | null }
     return data.product ?? null
   } catch {
-    return lookupProduct(request)
+    let product = lookupProduct(request)
+    if (!product && request.kind === 'barcode') {
+      product = await lookupOpenFoodFactsByBarcode(request.code)
+    }
+    if (!product && request.kind === 'ocr') {
+      product = await searchOpenFoodFactsByText(request.text)
+    }
+    return product
   }
 }
