@@ -1,12 +1,12 @@
 import type { LookupRequest, ScanOutcome, PipelineStep } from '../domain/types'
 import { scanBarcodeFromImage } from './barcode'
 import { runOcr } from './ocr'
-import { classifyVisual } from './vision'
+import { classifyVisual, lookupByVisualLabel } from './vision'
 import { fetchProductLookup } from '../api/productLookupApi'
 
 /**
- * Barcode (ZXing) → Open Food Facts / catalog → OCR (Tesseract) → text search / mock catalog.
- * No fingerprint-based fake products.
+ * Barcode (ZXing) → Open Food Facts / catalog → OCR (Tesseract) → text search / catalog →
+ * Visual classification fallback → no match.
  */
 export async function runScanPipeline(imageBlob: Blob): Promise<ScanOutcome> {
   const steps: PipelineStep[] = []
@@ -42,13 +42,24 @@ export async function runScanPipeline(imageBlob: Blob): Promise<ScanOutcome> {
       }
     }
 
-    const vision = await classifyVisual()
+    // Visual classification fallback — uses OCR text to match catalog visualLabels
+    const vision = await classifyVisual(ocr.result.text)
     steps.push(vision.step)
+
+    if (vision.result.confidence >= 0.4) {
+      const visualHit = lookupByVisualLabel(
+        vision.result.label,
+        vision.result.confidence,
+      )
+      if (visualHit) {
+        return { status: 'success', result: visualHit, steps }
+      }
+    }
 
     return {
       status: 'no_match',
       steps,
-      hint: 'No match for this barcode in our catalog or Open Food Facts, and OCR did not yield a reliable product. Try centering the barcode or the product name, with good light.',
+      hint: 'No match found via barcode, OCR, or visual classification. Try centering the barcode or product name with good lighting.',
     }
   } catch (e) {
     const message =

@@ -16,6 +16,7 @@ export default function App() {
     {},
   )
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [capturedImageUrl, setCapturedImageUrl] = useState<string | null>(null)
 
   const displayProduct = useMemo((): ProductResult | null => {
     if (!outcome || outcome.status !== 'success') return null
@@ -26,6 +27,8 @@ export default function App() {
     setPhase('loading')
     setErrorMessage(null)
     setCorrections({})
+    const imgUrl = URL.createObjectURL(blob)
+    setCapturedImageUrl(imgUrl)
     try {
       const res = await runScanPipeline(blob)
       setOutcome(res)
@@ -48,7 +51,9 @@ export default function App() {
     setOutcome(null)
     setCorrections({})
     setErrorMessage(null)
-  }, [])
+    if (capturedImageUrl) URL.revokeObjectURL(capturedImageUrl)
+    setCapturedImageUrl(null)
+  }, [capturedImageUrl])
 
   const handleApplyCorrection = useCallback((name: string, brand: string) => {
     setCorrections({ name, brand })
@@ -90,6 +95,7 @@ export default function App() {
             product={displayProduct}
             steps={outcome.status !== 'error' ? outcome.steps : []}
             noMatchHint={outcome.status === 'no_match' ? outcome.hint : undefined}
+            imageUrl={capturedImageUrl}
             onRetake={handleRetake}
             onApplyCorrection={handleApplyCorrection}
           />
