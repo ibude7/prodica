@@ -1,11 +1,15 @@
-# https://render.com/docs/blueprint-spec
-# Connect this repo in the Render dashboard → New Blueprint Instance, or create a Web Service with these commands.
+# Render Blueprint: https://render.com/docs/infrastructure-as-code
+# Dashboard → New → Blueprint → connect this repository (or paste the repo URL).
+
 services:
   - type: web
     name: prodica
     runtime: node
+    plan: free
+    region: oregon
     buildCommand: npm ci && npm run build
     startCommand: npm start
+    healthCheckPath: /health
     envVars:
       - key: NODE_ENV
         value: production
