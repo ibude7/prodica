@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import type { DataProvenance, PipelineStep, ProductResult } from '../../domain/types'
 import { SectionCard } from '../../components/SectionCard'
 import { ProvenanceLabel } from '../../components/ProvenanceLabel'
@@ -36,10 +36,42 @@ function ListBlock(props: {
   )
 }
 
+function CollapsibleSection(props: {
+  title: string
+  children: React.ReactNode
+  variant?: 'default' | 'safety' | 'muted'
+  action?: React.ReactNode
+  defaultOpen?: boolean
+}) {
+  const [open, setOpen] = useState(props.defaultOpen ?? true)
+  return (
+    <SectionCard
+      title={props.title}
+      variant={props.variant}
+      action={
+        <div className="section-card__actions">
+          {props.action}
+          <button
+            type="button"
+            className="btn btn--small btn--ghost"
+            onClick={() => setOpen((v) => !v)}
+            aria-label={open ? 'Collapse' : 'Expand'}
+          >
+            {open ? '▲' : '▼'}
+          </button>
+        </div>
+      }
+    >
+      {open ? props.children : null}
+    </SectionCard>
+  )
+}
+
 export function ProductResultView(props: {
   product: ProductResult | null
   steps: PipelineStep[]
   noMatchHint?: string
+  imageUrl?: string | null
   onRetake: () => void
   onApplyCorrection: (name: string, brand: string) => void
 }) {
@@ -66,6 +98,27 @@ export function ProductResultView(props: {
       </dl>
     )
   }, [props.product?.nutritionFacts.value])
+
+  const [copied, setCopied] = useState(false)
+
+  const copyProductInfo = useCallback(() => {
+    if (!props.product) return
+    const p = props.product
+    const lines: string[] = []
+    if (p.name.value) lines.push(`Name: ${p.name.value}`)
+    if (p.brand.value) lines.push(`Brand: ${p.brand.value}`)
+    if (p.category.value) lines.push(`Category: ${p.category.value}`)
+    if (p.origin.value) lines.push(`Origin: ${p.origin.value}`)
+    if (p.contents.value) lines.push(`Contents: ${p.contents.value}`)
+    if (p.ingredients.value) lines.push(`Ingredients: ${p.ingredients.value}`)
+    if (p.warnings.value?.length) lines.push(`Warnings: ${p.warnings.value.join('; ')}`)
+    if (p.storage.value) lines.push(`Storage: ${p.storage.value}`)
+    lines.push(`Confidence: ${Math.round(p.confidence * 100)}% (${p.source})`)
+    void navigator.clipboard.writeText(lines.join('\n')).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    })
+  }, [props.product])
 
   if (props.noMatchHint && !props.product) {
     return (
@@ -113,11 +166,20 @@ export function ProductResultView(props: {
       <header className="result-header">
         <h1 className="result-title">Product details</h1>
         <div className="result-header__actions">
+          <button type="button" className="btn btn--small" onClick={copyProductInfo}>
+            {copied ? 'Copied' : 'Copy info'}
+          </button>
           <button type="button" className="btn btn--ghost" onClick={props.onRetake}>
             Retake photo
           </button>
         </div>
       </header>
+
+      {props.imageUrl ? (
+        <div className="result-image-preview">
+          <img src={props.imageUrl} alt="Scanned product" className="result-image-preview__img" />
+        </div>
+      ) : null}
 
       {showLow ? (
         <StateBanner
@@ -208,7 +270,7 @@ export function ProductResultView(props: {
         />
       </SectionCard>
 
-      <SectionCard title="Ingredients & composition">
+      <CollapsibleSection title="Ingredients & composition">
         <FieldRow
           label="Ingredients"
           value={p.ingredients.value ?? null}
@@ -230,29 +292,29 @@ export function ProductResultView(props: {
             provenance={p.dosageWarnings.provenance}
           />
         ) : null}
-      </SectionCard>
+      </CollapsibleSection>
 
-      <SectionCard title="Nutrition">
+      <CollapsibleSection title="Nutrition">
         {nutrition ?? <p className="muted">No nutrition facts for this entry.</p>}
-      </SectionCard>
+      </CollapsibleSection>
 
-      <SectionCard title="Warnings & safety" variant="safety">
+      <CollapsibleSection title="Warnings & safety" variant="safety">
         {p.warnings.value?.length ? (
           <ListBlock items={p.warnings.value} provenance={p.warnings.provenance} />
         ) : (
-          <p className="muted">No warnings listed for this mock entry.</p>
+          <p className="muted">No warnings listed for this entry.</p>
         )}
-      </SectionCard>
+      </CollapsibleSection>
 
-      <SectionCard title="Storage">
+      <CollapsibleSection title="Storage" defaultOpen={false}>
         <FieldRow
           label="Storage"
           value={p.storage.value ?? null}
           provenance={p.storage.provenance}
         />
-      </SectionCard>
+      </CollapsibleSection>
 
-      <SectionCard title="Pairings & tips" variant="muted">
+      <CollapsibleSection title="Pairings & tips" variant="muted" defaultOpen={false}>
         {p.pairings.value?.length ? (
           <ListBlock items={p.pairings.value} provenance={p.pairings.provenance} />
         ) : (
@@ -267,9 +329,9 @@ export function ProductResultView(props: {
             />
           </div>
         ) : null}
-      </SectionCard>
+      </CollapsibleSection>
 
-      <SectionCard title="Scan trace" variant="muted">
+      <CollapsibleSection title="Scan trace" variant="muted" defaultOpen={false}>
         {p.scanNotes ? <p className="mono small">{p.scanNotes}</p> : null}
         <ul className="pipeline-list">
           {props.steps.map((s, i) => (
@@ -278,7 +340,7 @@ export function ProductResultView(props: {
             </li>
           ))}
         </ul>
-      </SectionCard>
+      </CollapsibleSection>
     </div>
   )
 }
