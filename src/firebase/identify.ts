@@ -30,6 +30,7 @@ Rules:
 - summary: 1–3 sentences useful to a curious user.
 - tags: short searchable labels.
 - warnings: safety, legal age, allergen, or uncertainty flags when relevant.
+- imageQuery: a short canonical search phrase for finding reference photos (e.g. "Eiffel Tower Paris" or "Coca-Cola Classic can"). Never invent image URLs.
 - Return one JSON object matching the response schema exactly.`
 
 const labelValueSchema = Schema.object({
@@ -252,9 +253,10 @@ const entityResponseSchema = Schema.object({
     tags: Schema.array({ items: Schema.string() }),
     warnings: Schema.array({ items: Schema.string() }),
     scanNotes: Schema.string(),
+    imageQuery: Schema.string(),
     facets: facetsSchema,
   },
-  optionalProperties: ['subtitle', 'scanNotes'],
+  optionalProperties: ['subtitle', 'scanNotes', 'imageQuery'],
 })
 
 async function blobToInlinePart(blob: Blob): Promise<{

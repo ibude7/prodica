@@ -346,16 +346,19 @@ export function coerceLlmPayload(raw: unknown): unknown {
       ? Math.min(1, Math.max(0, confidenceRaw))
       : 0.5
 
+  const name =
+    typeof o.name === 'string' && o.name.trim() ? o.name : 'Unknown'
   return {
     id: typeof o.id === 'string' && o.id.trim() ? o.id : `vision-${kind}`,
     kind,
-    name: typeof o.name === 'string' && o.name.trim() ? o.name : 'Unknown',
+    name,
     subtitle: str(o.subtitle),
     summary: typeof o.summary === 'string' ? o.summary : '',
     confidence,
     tags: arr(o.tags),
     warnings: arr(o.warnings),
     scanNotes: str(o.scanNotes),
+    imageQuery: str(o.imageQuery) ?? name,
     facets,
   }
 }

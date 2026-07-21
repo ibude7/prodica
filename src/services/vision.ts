@@ -37,9 +37,7 @@ async function identifyViaServer(
     return {
       entity: null,
       error:
-        e instanceof Error
-          ? e.message
-          : 'Server identify unavailable',
+        e instanceof Error ? e.message : 'Server identify unavailable',
     }
   }
 }
@@ -67,10 +65,7 @@ async function identifyViaFirebase(
 }
 
 /**
- * Visual identify.
- * - Production (Vercel/Render): server Vertex first (reliable with ADC on Render),
- *   then Firebase Vertex AI.
- * - Dev: Firebase first (App Check debug), then local API.
+ * Visual identify — race server + Firebase; first success wins.
  */
 export async function identifyFromImage(
   imageBlob: Blob,
@@ -80,60 +75,77 @@ export async function identifyFromImage(
   step: PipelineStep
   error?: string
 }> {
-  const serverFirst = import.meta.env.PROD
+  const serverP = identifyViaServer(imageBlob, hints)
+  const firebaseP = identifyViaFirebase(imageBlob, hints)
 
-  if (serverFirst) {
-    const server = await identifyViaServer(imageBlob, hints)
-    if (server.entity) {
-      return {
-        entity: server.entity,
-        step: {
-          step: 'visual',
-          outcome: `Server identified as ${server.entity.kind}: ${server.entity.name.value ?? 'unknown'}`,
-        },
+  const winner = await new Promise<{
+    entity: IdentifiedEntity | null
+    label: string
+    serverError?: string
+    firebaseError?: string
+  }>((resolve) => {
+    let settled = false
+    let serverDone:
+      | { entity: IdentifiedEntity | null; error?: string }
+      | undefined
+    let firebaseDone:
+      | { entity: IdentifiedEntity | null; error?: string }
+      | undefined
+
+    const tryFinish = () => {
+      if (settled) return
+      if (serverDone?.entity) {
+        settled = true
+        resolve({
+          entity: serverDone.entity,
+          label: 'Server',
+          serverError: serverDone.error,
+          firebaseError: firebaseDone?.error,
+        })
+        return
+      }
+      if (firebaseDone?.entity) {
+        settled = true
+        resolve({
+          entity: firebaseDone.entity,
+          label: 'Firebase AI',
+          serverError: serverDone?.error,
+          firebaseError: firebaseDone.error,
+        })
+        return
+      }
+      if (serverDone && firebaseDone) {
+        settled = true
+        resolve({
+          entity: null,
+          label: 'none',
+          serverError: serverDone.error,
+          firebaseError: firebaseDone.error,
+        })
       }
     }
-    const firebase = await identifyViaFirebase(imageBlob, hints)
-    if (firebase.entity) {
-      return {
-        entity: firebase.entity,
-        step: {
-          step: 'visual',
-          outcome: `Firebase AI identified as ${firebase.entity.kind}: ${firebase.entity.name.value ?? 'unknown'} (server: ${server.error ?? 'failed'})`,
-        },
-      }
-    }
-    const message = `AI: ${firebase.error ?? 'failed'}${server.error ? ` · Server: ${server.error}` : ''}`
-    return {
-      entity: null,
-      error: message,
-      step: { step: 'visual', outcome: message },
-    }
-  }
 
-  const firebase = await identifyViaFirebase(imageBlob, hints)
-  if (firebase.entity) {
+    void serverP.then((r) => {
+      serverDone = r
+      tryFinish()
+    })
+    void firebaseP.then((r) => {
+      firebaseDone = r
+      tryFinish()
+    })
+  })
+
+  if (winner.entity) {
     return {
-      entity: firebase.entity,
+      entity: winner.entity,
       step: {
         step: 'visual',
-        outcome: `Firebase AI identified as ${firebase.entity.kind}: ${firebase.entity.name.value ?? 'unknown'}`,
+        outcome: `${winner.label} identified as ${winner.entity.kind}: ${winner.entity.name.value ?? 'unknown'}`,
       },
     }
   }
 
-  const server = await identifyViaServer(imageBlob, hints)
-  if (server.entity) {
-    return {
-      entity: server.entity,
-      step: {
-        step: 'visual',
-        outcome: `Server fallback identified as ${server.entity.kind}: ${server.entity.name.value ?? 'unknown'} (Firebase: ${firebase.error ?? 'failed'})`,
-      },
-    }
-  }
-
-  const message = `AI: ${firebase.error ?? 'failed'}${server.error ? ` · Server: ${server.error}` : ''}`
+  const message = `AI: ${winner.firebaseError ?? 'failed'}${winner.serverError ? ` · Server: ${winner.serverError}` : ''}`
   return {
     entity: null,
     error: message,

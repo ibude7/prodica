@@ -249,6 +249,8 @@ const coreFields = {
   tags: z.array(z.string()),
   warnings: z.array(z.string()),
   scanNotes: z.string().nullable(),
+  /** Canonical search query for reference images — never invent image URLs */
+  imageQuery: z.string().nullable().optional(),
 }
 
 /** LLM / API output schema — plain values; provenance applied when mapping to IdentifiedEntity */

@@ -18,7 +18,6 @@ import {
   FIREBASE_DEFAULTS,
   geminiModelCandidates,
 } from '../src/firebase/defaults'
-
 const SYSTEM_PROMPT = `You are Prodica, a universal visual identification system.
 Given a photo (and optional OCR/barcode hints), identify the primary subject.
 
@@ -33,6 +32,7 @@ Rules:
 - summary: 1–3 sentences useful to a curious user.
 - tags: short searchable labels.
 - warnings: safety, legal age, allergen, or uncertainty flags when relevant.
+- imageQuery: a short canonical search phrase for finding reference photos (e.g. "Eiffel Tower Paris"). Never invent image URLs.
 - Return one JSON object only (no markdown).`
 
 function geminiApiKey(): string | undefined {
@@ -48,8 +48,6 @@ function vertexProject(): string {
   return (
     process.env.GOOGLE_CLOUD_PROJECT?.trim() ||
     process.env.GOOGLE_VERTEX_PROJECT?.trim() ||
-    process.env.GCLOUD_PROJECT?.trim() ||
-    process.env.VITE_FIREBASE_PROJECT_ID?.trim() ||
     FIREBASE_DEFAULTS.projectId
   )
 }
@@ -58,7 +56,6 @@ function vertexLocation(): string {
   return (
     process.env.GOOGLE_CLOUD_LOCATION?.trim() ||
     process.env.GOOGLE_VERTEX_LOCATION?.trim() ||
-    process.env.VITE_FIREBASE_VERTEX_LOCATION?.trim() ||
     DEFAULT_VERTEX_LOCATION
   )
 }
@@ -99,18 +96,21 @@ function vertexAuthOptions() {
   return { authClient: client }
 }
 
+function createVertexProvider() {
+  return createVertex({
+    project: vertexProject(),
+    location: vertexLocation(),
+    googleAuthOptions: vertexAuthOptions(),
+  })
+}
+
 function resolveModel(modelId: string): LanguageModel {
   const useVertex =
     process.env.VERTEX_AI !== '0' &&
     process.env.GEMINI_PROVIDER?.trim() !== 'google-ai'
 
   if (useVertex) {
-    const vertex = createVertex({
-      project: vertexProject(),
-      location: vertexLocation(),
-      googleAuthOptions: vertexAuthOptions(),
-    })
-    return vertex(modelId)
+    return createVertexProvider()(modelId)
   }
 
   const geminiKey = geminiApiKey()
@@ -142,7 +142,7 @@ export async function identifyWithVision(input: {
   barcode?: string
 }): Promise<IdentifiedEntity> {
   const hintParts: string[] = [
-    'Identify the primary subject in this image and return structured JSON matching the Prodica entity schema (kind, name, summary, confidence, tags, warnings, scanNotes, facets).',
+    'Identify the primary subject in this image and return structured JSON matching the Prodica entity schema (kind, name, summary, confidence, tags, warnings, scanNotes, imageQuery, facets).',
   ]
   if (input.barcode) {
     hintParts.push(`Barcode hint (may be unrelated if misread): ${input.barcode}`)
@@ -199,6 +199,7 @@ export async function identifyWithVision(input: {
       const normalized = ensureId(validated.data, input.imageBuffer)
       const source: ScanSource =
         input.barcode || input.ocrText?.trim() ? 'combined' : 'visual'
+      // Return immediately — reference images enrich async on the client
       return llmToIdentifiedEntity(normalized, source)
     } catch (err) {
       lastError = err

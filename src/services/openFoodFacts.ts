@@ -1,5 +1,44 @@
-import type { IdentifiedEntity, NutritionFact } from '../domain/types'
+import type {
+  EntityImage,
+  IdentifiedEntity,
+  NutritionFact,
+} from '../domain/types'
 import { toConfidenceLevel } from '../domain/intelligence'
+
+function collectOffImages(raw: Record<string, unknown>): EntityImage[] {
+  const candidates: { url: unknown; caption: string }[] = [
+    {
+      url: raw.image_front_url ?? raw.image_url,
+      caption: 'Product front',
+    },
+    {
+      url: raw.image_ingredients_url,
+      caption: 'Ingredients',
+    },
+    {
+      url: raw.image_nutrition_url,
+      caption: 'Nutrition',
+    },
+  ]
+  const seen = new Set<string>()
+  const out: EntityImage[] = []
+  for (const c of candidates) {
+    const url = typeof c.url === 'string' ? c.url.trim() : ''
+    if (!url || seen.has(url)) continue
+    seen.add(url)
+    out.push({
+      url,
+      thumbUrl:
+        typeof raw.image_front_small_url === 'string'
+          ? raw.image_front_small_url
+          : undefined,
+      caption: c.caption,
+      source: 'openfoodfacts',
+      provenance: 'confirmed',
+    })
+  }
+  return out
+}
 
 /** Required by Open Food Facts API usage policy */
 export const OPEN_FOOD_FACTS_UA =
@@ -197,6 +236,8 @@ function mapOffProduct(
         ? `Open Food Facts · ${catTag.replace(/^..:/, '')}. Community data — verify on pack.`
         : 'Open Food Facts (community-sourced). Verify allergens and nutrition on the package.'
 
+  const images = collectOffImages(raw)
+
   if (asAlcohol) {
     return {
       id: `off-${code}`,
@@ -212,6 +253,8 @@ function mapOffProduct(
       tags: tags.slice(0, 6).map((t) => t.replace(/^..:/, '')),
       warnings,
       scanNotes,
+      imageQuery: [name, brandRaw].filter(Boolean).join(' '),
+      images,
       facets: {
         abv: alcoholNum,
         style: catTag.replace(/^..:/, '') || null,
@@ -239,6 +282,8 @@ function mapOffProduct(
     tags: tags.slice(0, 6).map((t) => t.replace(/^..:/, '')),
     warnings,
     scanNotes,
+    imageQuery: [name, brandRaw].filter(Boolean).join(' '),
+    images,
     facets: {
       ingredients,
       allergens,

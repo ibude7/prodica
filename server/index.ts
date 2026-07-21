@@ -6,13 +6,16 @@ import dotenv from 'dotenv'
 import express from 'express'
 import multer from 'multer'
 
-import type { IdentifiedEntity, LookupRequest } from '../src/domain/types'
+import type { EntityKind, IdentifiedEntity, LookupRequest } from '../src/domain/types'
+import { ENTITY_KINDS } from '../src/domain/entitySchema'
 import {
   lookupOpenFoodFactsByBarcode,
   searchOpenFoodFactsByText,
 } from '../src/services/openFoodFacts'
 import { ensureGoogleApplicationCredentials } from './googleCredentials'
+import { handleImageProxy } from './imageProxy'
 import { identifyWithVision } from './identifyWithVision'
+import { enrichMedia } from './mediaEnrichment'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const rootDir = path.join(__dirname, '..')
@@ -122,6 +125,52 @@ app.post('/v1/identify', upload.single('image'), async (req, res) => {
         : 500
     res.status(status).json({ error: message })
   }
+})
+
+/** Layered reference-image enrichment (Wikimedia + optional CSE + grounding URLs). */
+app.post('/v1/enrich', async (req, res) => {
+  try {
+    const body = req.body as Record<string, unknown>
+    const kindRaw = typeof body.kind === 'string' ? body.kind : 'other'
+    const kind = (ENTITY_KINDS as readonly string[]).includes(kindRaw)
+      ? (kindRaw as EntityKind)
+      : 'other'
+    const name = typeof body.name === 'string' ? body.name : ''
+    if (!name.trim()) {
+      res.status(400).json({ error: 'Missing name' })
+      return
+    }
+    const tags = Array.isArray(body.tags)
+      ? body.tags.filter((t): t is string => typeof t === 'string')
+      : []
+    const imageQuery =
+      typeof body.imageQuery === 'string' ? body.imageQuery : undefined
+    const barcode =
+      typeof body.barcode === 'string' ? body.barcode : undefined
+    const groundingUrls = Array.isArray(body.groundingUrls)
+      ? body.groundingUrls.filter((u): u is string => typeof u === 'string')
+      : undefined
+
+    const images = await enrichMedia({
+      kind,
+      name,
+      tags,
+      imageQuery,
+      barcode,
+      groundingUrls,
+    })
+    res.json({ images })
+  } catch (e) {
+    console.error(e)
+    res.status(500).json({
+      error: e instanceof Error ? e.message : 'Enrich failed',
+      images: [],
+    })
+  }
+})
+
+app.get('/v1/image', (req, res) => {
+  void handleImageProxy(req, res)
 })
 
 app.get('/health', (_req, res) => {

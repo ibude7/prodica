@@ -10,6 +10,22 @@ export type ConfidenceLevel = 'high' | 'medium' | 'low'
 
 export type { EntityKind }
 
+export type EntityImageSource =
+  | 'openfoodfacts'
+  | 'wikimedia'
+  | 'grounding'
+  | 'cse'
+  | 'captured'
+
+/** Reference or captured image attached to an identified entity */
+export interface EntityImage {
+  url: string
+  thumbUrl?: string
+  caption?: string
+  source: EntityImageSource
+  provenance: DataProvenance
+}
+
 export interface NutritionFact {
   label: string
   value: string
@@ -34,6 +50,12 @@ export type IdentifiedEntity = {
     tags: string[]
     warnings: string[]
     scanNotes?: string
+    /** Canonical search term for reference-image enrichment */
+    imageQuery?: string
+    /** Reference images from OFF / Wikimedia / grounding / CSE */
+    images: EntityImage[]
+    /** Object URL or data URL of the user's captured photo */
+    capturedPhoto?: string
     facets: Extract<IdentifiedEntityLlm, { kind: K }>['facets']
   }
 }[EntityKind]

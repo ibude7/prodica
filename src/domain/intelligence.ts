@@ -38,6 +38,10 @@ export function llmToIdentifiedEntity(
   const provenance: DataProvenance =
     source === 'barcode' ? 'confirmed' : 'inferred'
   const conf = Math.min(1, Math.max(0, raw.confidence))
+  const imageQuery =
+    typeof raw.imageQuery === 'string' && raw.imageQuery.trim()
+      ? raw.imageQuery.trim()
+      : raw.name?.trim() || undefined
   return {
     id: raw.id,
     kind: raw.kind,
@@ -50,6 +54,8 @@ export function llmToIdentifiedEntity(
     tags: raw.tags,
     warnings: raw.warnings,
     scanNotes: raw.scanNotes ?? undefined,
+    imageQuery,
+    images: [],
     facets: raw.facets,
   } as IdentifiedEntity
 }
@@ -81,6 +87,8 @@ export function catalogToIdentifiedEntity(
       tags: [record.category, record.origin].filter(Boolean),
       warnings: record.warnings,
       scanNotes: ctx.scanNotes,
+      imageQuery: [record.name, record.brand].filter(Boolean).join(' '),
+      images: [],
       facets: {
         abv: record.alcoholPercent,
         style: record.category === 'wine' ? 'Wine' : null,
@@ -109,6 +117,8 @@ export function catalogToIdentifiedEntity(
       tags: ['medicine'],
       warnings: record.warnings,
       scanNotes: ctx.scanNotes,
+      imageQuery: [record.name, record.brand].filter(Boolean).join(' '),
+      images: [],
       facets: {
         activeIngredients: record.activeIngredients ?? [],
         dosage: record.dosageWarnings ?? null,
@@ -133,6 +143,8 @@ export function catalogToIdentifiedEntity(
     tags: [record.category, record.origin].filter(Boolean),
     warnings: record.warnings,
     scanNotes: ctx.scanNotes,
+    imageQuery: [record.name, record.brand].filter(Boolean).join(' '),
+    images: [],
     facets: {
       ingredients: record.ingredients || null,
       allergens: [],

@@ -1,14 +1,14 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { IdentifiedEntity, PipelineStep } from '../../domain/types'
 import { SectionCard } from '../../components/SectionCard'
 import { ConfidenceBanner } from '../../components/ConfidenceBanner'
 import { StateBanner } from '../../components/StateBanner'
 import { ListBlock } from './fieldUi'
 import { FacetSections } from './FacetSections'
-
-function kindLabel(kind: string): string {
-  return kind.replace(/_/g, ' ')
-}
+import { ResultHero } from './ResultHero'
+import { ReferenceGallery } from './ReferenceGallery'
+import { HeroFields } from './HeroFields'
+import { ShareButton } from './ShareButton'
 
 export function EntityResultView(props: {
   entity: IdentifiedEntity | null
@@ -17,6 +17,7 @@ export function EntityResultView(props: {
   onRetake: () => void
   onApplyCorrection: (name: string, subtitle: string) => void
 }) {
+  const headingRef = useRef<HTMLDivElement>(null)
   const [nameEdit, setNameEdit] = useState(
     () => props.entity?.name.value ?? '',
   )
@@ -24,9 +25,13 @@ export function EntityResultView(props: {
     () => props.entity?.subtitle.value ?? '',
   )
 
+  useEffect(() => {
+    headingRef.current?.querySelector<HTMLElement>('#result-heading')?.focus()
+  }, [props.entity?.id])
+
   if (props.noMatchHint && !props.entity) {
     return (
-      <div className="result-screen">
+      <div className="result-screen fade-in">
         <header className="result-header">
           <h1 className="result-title">No match</h1>
           <div className="result-header__actions">
@@ -69,21 +74,12 @@ export function EntityResultView(props: {
   const showLow = e.confidenceLevel === 'low'
 
   return (
-    <div className="result-screen">
-      <header className="result-header">
-        <div>
-          <p className="kind-badge">{kindLabel(e.kind)}</p>
-          <h1 className="result-title">{e.name.value ?? 'Unknown'}</h1>
-          {e.subtitle.value ? (
-            <p className="result-subtitle">{e.subtitle.value}</p>
-          ) : null}
-        </div>
-        <div className="result-header__actions">
-          <button type="button" className="btn btn--ghost" onClick={props.onRetake}>
-            Retake photo
-          </button>
-        </div>
-      </header>
+    <div className="result-screen fade-in" ref={headingRef} aria-live="polite">
+      <ResultHero
+        entity={e}
+        onRetake={props.onRetake}
+        actions={<ShareButton entity={e} />}
+      />
 
       {showLow ? (
         <StateBanner
@@ -128,6 +124,14 @@ export function EntityResultView(props: {
         {e.tags.length ? (
           <p className="help-text">{e.tags.join(' · ')}</p>
         ) : null}
+        <HeroFields entity={e} />
+      </SectionCard>
+
+      <SectionCard title="Reference images">
+        <ReferenceGallery
+          images={e.images}
+          subjectName={e.name.value ?? 'result'}
+        />
       </SectionCard>
 
       <SectionCard
