@@ -35,7 +35,7 @@ function yearField(v: unknown): string | number | null {
   return null
 }
 
-function emptyFacetsForKind(kind: EntityKind): Record<string, unknown> {
+export function emptyFacetsForKind(kind: EntityKind): Record<string, unknown> {
   const a = () => [] as string[]
   const lv = () => [] as { label: string; value: string }[]
   switch (kind) {

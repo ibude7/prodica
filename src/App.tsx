@@ -9,6 +9,7 @@ import { withEnrichedImages } from './services/mediaEnrichment'
 import { CameraHome } from './features/camera/CameraHome'
 import { EntityResultView } from './features/entity/EntityResultView'
 import { HistoryList } from './features/history/HistoryList'
+import { ErrorBoundary } from './components/ErrorBoundary'
 import { LoadingOverlay } from './components/LoadingOverlay'
 import { StateBanner } from './components/StateBanner'
 
@@ -181,20 +182,24 @@ export default function App() {
         ) : null}
 
         {phase === 'result' && outcome ? (
-          <EntityResultView
-            key={
-              displayEntity
-                ? `${displayEntity.id}:${displayEntity.name.value ?? ''}:${displayEntity.subtitle.value ?? ''}`
-                : outcome.status === 'no_match'
-                  ? 'no-match'
-                  : 'result'
-            }
-            entity={displayEntity}
-            steps={outcome.status !== 'error' ? outcome.steps : []}
-            noMatchHint={outcome.status === 'no_match' ? outcome.hint : undefined}
-            onRetake={handleRetake}
-            onApplyCorrection={handleApplyCorrection}
-          />
+          <ErrorBoundary onReset={handleRetake}>
+            <EntityResultView
+              key={
+                displayEntity
+                  ? `${displayEntity.id}:${displayEntity.name?.value ?? ''}:${displayEntity.subtitle?.value ?? ''}`
+                  : outcome.status === 'no_match'
+                    ? 'no-match'
+                    : 'result'
+              }
+              entity={displayEntity}
+              steps={outcome.status !== 'error' ? outcome.steps : []}
+              noMatchHint={
+                outcome.status === 'no_match' ? outcome.hint : undefined
+              }
+              onRetake={handleRetake}
+              onApplyCorrection={handleApplyCorrection}
+            />
+          </ErrorBoundary>
         ) : null}
       </main>
     </div>

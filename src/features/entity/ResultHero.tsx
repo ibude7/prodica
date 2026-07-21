@@ -24,7 +24,7 @@ export function ResultHero(props: {
           <figure className="result-hero__shot">
             <img
               src={captured}
-              alt={`Your photo of ${entity.name.value ?? 'the subject'}`}
+              alt={`Your photo of ${entity.name?.value ?? 'the subject'}`}
               width={480}
               height={640}
               className="result-hero__img"
@@ -42,7 +42,7 @@ export function ResultHero(props: {
               src={proxiedImageUrl(bestRef.thumbUrl || bestRef.url)}
               alt={
                 bestRef.caption ||
-                `Reference image for ${entity.name.value ?? 'result'}`
+                `Reference image for ${entity.name?.value ?? 'result'}`
               }
               width={480}
               height={640}
@@ -63,18 +63,18 @@ export function ResultHero(props: {
 
       <div className="result-hero__meta">
         <div className="result-hero__row">
-          <p className="kind-badge">{kindLabel(entity.kind)}</p>
+          <p className="kind-badge">{kindLabel(entity.kind ?? 'other')}</p>
           <span
-            className={`conf-chip conf-chip--${entity.confidenceLevel}`}
+            className={`conf-chip conf-chip--${entity.confidenceLevel ?? 'medium'}`}
             title={`Match confidence ${confPct}%`}
           >
             {confPct}%
           </span>
         </div>
         <h1 className="result-title" tabIndex={-1} id="result-heading">
-          {entity.name.value ?? 'Unknown'}
+          {entity.name?.value ?? 'Unknown'}
         </h1>
-        {entity.subtitle.value ? (
+        {entity.subtitle?.value ? (
           <p className="result-subtitle">{entity.subtitle.value}</p>
         ) : null}
         <div className="result-hero__actions">

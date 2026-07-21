@@ -32,7 +32,10 @@ async function identifyViaServer(
         error: body?.error ?? `Identify failed (HTTP ${res.status})`,
       }
     }
-    const data = (await res.json()) as { entity: IdentifiedEntity }
+    const data = (await res.json()) as { entity?: IdentifiedEntity | null }
+    if (!data.entity) {
+      return { entity: null, error: 'Identify returned no entity' }
+    }
     return { entity: normalizeIdentifiedEntity(data.entity) }
   } catch (e) {
     return {

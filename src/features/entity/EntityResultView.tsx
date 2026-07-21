@@ -19,10 +19,10 @@ export function EntityResultView(props: {
 }) {
   const headingRef = useRef<HTMLDivElement>(null)
   const [nameEdit, setNameEdit] = useState(
-    () => props.entity?.name.value ?? '',
+    () => props.entity?.name?.value ?? '',
   )
   const [subtitleEdit, setSubtitleEdit] = useState(
-    () => props.entity?.subtitle.value ?? '',
+    () => props.entity?.subtitle?.value ?? '',
   )
 
   useEffect(() => {
@@ -137,7 +137,7 @@ export function EntityResultView(props: {
 
       <SectionCard title="Summary">
         <p className="entity-summary">{e.summary}</p>
-        {e.tags.length ? (
+        {e.tags?.length ? (
           <p className="help-text">{e.tags.join(' · ')}</p>
         ) : null}
         <HeroFields entity={e} />
@@ -194,7 +194,7 @@ export function EntityResultView(props: {
       <FacetSections entity={e} />
 
       <SectionCard title="Warnings & safety" variant="safety">
-        {e.warnings.length ? (
+        {e.warnings?.length ? (
           <ListBlock items={e.warnings} />
         ) : (
           <p className="muted">No warnings listed.</p>
@@ -204,7 +204,7 @@ export function EntityResultView(props: {
       <SectionCard title="Scan trace" variant="muted">
         {e.scanNotes ? <p className="mono small">{e.scanNotes}</p> : null}
         <ul className="pipeline-list">
-          {props.steps.map((s, i) => (
+          {(props.steps ?? []).map((s, i) => (
             <li key={`${s.step}-${i}`}>
               <strong>{s.step}</strong>: {s.outcome}
             </li>

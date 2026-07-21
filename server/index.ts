@@ -113,7 +113,13 @@ app.post('/v1/identify', upload.single('image'), async (req, res) => {
       ocrText,
       barcode,
     })
-    res.json({ entity })
+    // Always include images[] so older/newer clients never see undefined
+    res.json({
+      entity: {
+        ...entity,
+        images: Array.isArray(entity.images) ? entity.images : [],
+      },
+    })
   } catch (e) {
     console.error(e)
     const message = e instanceof Error ? e.message : 'Identify failed'
