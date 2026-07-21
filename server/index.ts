@@ -129,10 +129,20 @@ app.get('/health', (_req, res) => {
 if (isProd) {
   const distDir = path.join(__dirname, '../dist')
   app.use(express.static(distDir))
+  // SPA fallback so https://prodica.onrender.com serves the Firebase-enabled client
+  app.get(/.*/, (req, res, next) => {
+    if (req.path.startsWith('/v1/') || req.path === '/health') {
+      next()
+      return
+    }
+    res.sendFile(path.join(distDir, 'index.html'), (err) => {
+      if (err) next(err)
+    })
+  })
 }
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log(
-    `Prodica listening on http://0.0.0.0:${PORT}${isProd ? ' (API + static)' : ' (API only)'}`,
+    `Prodica listening on http://0.0.0.0:${PORT}${isProd ? ' (API + static + Firebase client)' : ' (API only)'}`,
   )
 })

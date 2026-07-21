@@ -1,4 +1,5 @@
 import { apiUrl } from '../api/apiBase'
+import { identifyWithFirebaseAi } from '../firebase/identify'
 import type { IdentifiedEntity, PipelineStep } from '../domain/types'
 
 export interface IdentifyHints {
@@ -6,15 +7,11 @@ export interface IdentifyHints {
   barcode?: string
 }
 
-/**
- * Universal visual identify via server (AI Gateway multimodal model).
- */
-export async function identifyFromImage(
+async function identifyViaServer(
   imageBlob: Blob,
-  hints: IdentifyHints = {},
+  hints: IdentifyHints,
 ): Promise<{
   entity: IdentifiedEntity | null
-  step: PipelineStep
   error?: string
 }> {
   const url = apiUrl('/v1/identify')
@@ -29,29 +26,67 @@ export async function identifyFromImage(
       const body = (await res.json().catch(() => null)) as {
         error?: string
       } | null
-      const message = body?.error ?? `Identify failed (HTTP ${res.status})`
       return {
         entity: null,
-        error: message,
-        step: {
-          step: 'visual',
-          outcome: message,
-        },
+        error: body?.error ?? `Identify failed (HTTP ${res.status})`,
       }
     }
     const data = (await res.json()) as { entity: IdentifiedEntity }
+    return { entity: data.entity }
+  } catch (e) {
     return {
-      entity: data.entity,
+      entity: null,
+      error:
+        e instanceof Error
+          ? e.message
+          : 'Server identify unavailable',
+    }
+  }
+}
+
+/**
+ * Visual identify: Firebase AI Logic (Gemini Developer API) first,
+ * then Render `/v1/identify` as fallback.
+ */
+export async function identifyFromImage(
+  imageBlob: Blob,
+  hints: IdentifyHints = {},
+): Promise<{
+  entity: IdentifiedEntity | null
+  step: PipelineStep
+  error?: string
+}> {
+  try {
+    const entity = await identifyWithFirebaseAi({
+      imageBlob,
+      ocrText: hints.ocrText,
+      barcode: hints.barcode,
+    })
+    return {
+      entity,
       step: {
         step: 'visual',
-        outcome: `Identified as ${data.entity.kind}: ${data.entity.name.value ?? 'unknown'}`,
+        outcome: `Firebase AI identified as ${entity.kind}: ${entity.name.value ?? 'unknown'}`,
       },
     }
-  } catch (e) {
-    const message =
-      e instanceof Error
-        ? e.message
-        : 'Visual identify unavailable — is the API running with GEMINI_API_KEY?'
+  } catch (firebaseErr) {
+    const firebaseMessage =
+      firebaseErr instanceof Error
+        ? firebaseErr.message
+        : 'Firebase AI identify failed'
+
+    const server = await identifyViaServer(imageBlob, hints)
+    if (server.entity) {
+      return {
+        entity: server.entity,
+        step: {
+          step: 'visual',
+          outcome: `Server fallback identified as ${server.entity.kind}: ${server.entity.name.value ?? 'unknown'} (Firebase: ${firebaseMessage})`,
+        },
+      }
+    }
+
+    const message = `${firebaseMessage}${server.error ? ` · Server: ${server.error}` : ''}`
     return {
       entity: null,
       error: message,

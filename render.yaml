@@ -13,6 +13,8 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
-      # Set in Render Dashboard → Environment (sync: false = prompt / manual)
-      - key: GEMINI_API_KEY
+      # Optional override; server defaults to Firebase prodica1 web API key
+      - key: FIREBASE_API_KEY
         sync: false
+      - key: GEMINI_MODEL
+        value: gemini-2.5-flash

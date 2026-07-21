@@ -9,6 +9,10 @@ import {
 } from '../src/domain/entitySchema'
 import { llmToIdentifiedEntity } from '../src/domain/intelligence'
 import type { IdentifiedEntity, ScanSource } from '../src/domain/types'
+import {
+  DEFAULT_GEMINI_MODEL,
+  FIREBASE_DEFAULTS,
+} from '../src/firebase/defaults'
 
 const SYSTEM_PROMPT = `You are Prodica, a universal visual identification system.
 Given a photo (and optional OCR/barcode hints), identify the primary subject.
@@ -25,8 +29,18 @@ Rules:
 - tags: short searchable labels.
 - warnings: safety, legal age, allergen, or uncertainty flags when relevant.`
 
+/**
+ * Gemini Developer API key resolution for Render/server.
+ * Prefer explicit env; fall back to Firebase project web API key (prodica1).
+ */
 function geminiApiKey(): string | undefined {
+  // Prefer Firebase project web key (Gemini Developer API via prodica1),
+  // then explicit Gemini/AI Studio keys, so a denied Studio key on Render
+  // does not override the working Firebase key.
   return (
+    process.env.FIREBASE_API_KEY ||
+    process.env.VITE_FIREBASE_API_KEY ||
+    FIREBASE_DEFAULTS.apiKey ||
     process.env.GOOGLE_GENERATIVE_AI_API_KEY ||
     process.env.GEMINI_API_KEY ||
     process.env.GOOGLE_API_KEY ||
@@ -38,7 +52,11 @@ function resolveModel(): LanguageModel {
   const geminiKey = geminiApiKey()
   if (geminiKey) {
     const google = createGoogleGenerativeAI({ apiKey: geminiKey })
-    return google(process.env.GEMINI_MODEL?.trim() || 'gemini-2.5-flash')
+    return google(
+      process.env.GEMINI_MODEL?.trim() ||
+        process.env.VITE_FIREBASE_AI_MODEL?.trim() ||
+        DEFAULT_GEMINI_MODEL,
+    )
   }
 
   if (process.env.AI_GATEWAY_API_KEY || process.env.VERCEL_OIDC_TOKEN) {
@@ -46,7 +64,7 @@ function resolveModel(): LanguageModel {
   }
 
   throw new Error(
-    'No vision API key configured. Set GEMINI_API_KEY (or GOOGLE_GENERATIVE_AI_API_KEY) or AI_GATEWAY_API_KEY on the server.',
+    'No vision API key configured. Set GEMINI_API_KEY / FIREBASE_API_KEY or AI_GATEWAY_API_KEY on the server.',
   )
 }
 

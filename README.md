@@ -6,7 +6,7 @@ Universal visual identifier — point the camera at **anything** (food, books, p
 
 1. **Barcode** (ZXing) → Open Food Facts for packaged food/drink  
 2. **OCR** (Tesseract) → Open Food Facts text search  
-3. **Vision** → multimodal LLM (Gemini API key or [Vercel AI Gateway](https://vercel.com/docs/ai-gateway)) returns a structured `IdentifiedEntity` with deep per-kind facets
+3. **Vision** → [Firebase AI Logic](https://firebase.google.com/docs/ai-logic) (Gemini Developer API via project `prodica1`) in the browser, with Render `/v1/identify` as fallback
 
 ## Setup
 
@@ -14,17 +14,17 @@ Universal visual identifier — point the camera at **anything** (food, books, p
 npm install
 ```
 
-Set a **server-side** key (never put this in Vite client env). Either:
+### Firebase (client — Analytics + AI Logic)
+
+1. In [Firebase console](https://console.firebase.google.com/) → project **prodica1**, enable **Firebase AI Logic** and choose the **Gemini Developer API** provider.
+2. Restrict the web API key by HTTP referrer (`localhost`, `prodica.vercel.app`, etc.).
+3. Config is already in [`src/firebase/config.ts`](src/firebase/config.ts) (overridable with `VITE_FIREBASE_*` env vars).
+
+### Optional server fallback
 
 ```bash
-# Google AI Studio / Gemini (used first if present)
 export GEMINI_API_KEY=your_gemini_key
-```
-
-or
-
-```bash
-export AI_GATEWAY_API_KEY=your_gateway_key
+# or AI_GATEWAY_API_KEY=…
 ```
 
 ## Develop
@@ -49,18 +49,19 @@ npm run dev       # Vite only
 
 | Variable | Where | Purpose |
 |----------|--------|---------|
-| `GEMINI_API_KEY` | server | Gemini key for `/v1/identify` (also `GOOGLE_GENERATIVE_AI_API_KEY` / `GOOGLE_API_KEY`) |
+| `VITE_FIREBASE_*` | client (optional) | Override Firebase web config / `VITE_FIREBASE_AI_MODEL` |
+| `GEMINI_API_KEY` | server | Fallback Gemini key for `/v1/identify` |
 | `GEMINI_MODEL` | server (optional) | Gemini model id (default `gemini-2.5-flash`) |
-| `AI_GATEWAY_API_KEY` | server | Alternative to Gemini via Vercel AI Gateway |
+| `AI_GATEWAY_API_KEY` | server | Alternative server fallback via Vercel AI Gateway |
 | `PORT` | server | API port (default `3030`) |
 | `VITE_API_BASE` | client (optional) | Absolute API origin; on `*.vercel.app` defaults to `https://prodica.onrender.com` |
 
-### Split deploy (Vercel UI + Render API)
+### Deploy targets
 
-- Static app: [prodica.vercel.app](https://prodica.vercel.app)  
-- API: [prodica.onrender.com](https://prodica.onrender.com)  
+- **Render (full stack):** [prodica.onrender.com](https://prodica.onrender.com) — static SPA + API. Client uses Firebase AI; server `/v1/identify` uses the same Firebase `prodica1` Gemini Developer API key by default.
+- **Vercel UI + Render API:** [prodica.vercel.app](https://prodica.vercel.app) calls Render for server fallback.
 
-Add **`GEMINI_API_KEY`** in the Render dashboard (Environment). Without it, `/v1/identify` returns 503.
+In Google Cloud credentials, allow HTTP referrers: `localhost/*`, `prodica.vercel.app/*`, `prodica.onrender.com/*`.
 
 ## Production
 

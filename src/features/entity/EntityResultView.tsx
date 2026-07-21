@@ -40,7 +40,10 @@ export function EntityResultView(props: {
           <ul className="bullet-list">
             <li>Center the subject and improve lighting.</li>
             <li>For packaged goods, include the barcode or clear product name.</li>
-            <li>Ensure the API is running with GEMINI_API_KEY or AI_GATEWAY_API_KEY for visual ID.</li>
+            <li>
+              Enable Firebase AI Logic (Gemini Developer API) for project prodica1,
+              or set GEMINI_API_KEY on the Render API.
+            </li>
           </ul>
           <button type="button" className="btn btn--primary" onClick={props.onRetake}>
             Back to camera
