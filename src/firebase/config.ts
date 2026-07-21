@@ -3,8 +3,15 @@ import { FIREBASE_DEFAULTS } from './defaults'
 
 /**
  * Firebase web config (client-safe). Restrict this API key by HTTP referrer:
- * localhost, prodica.vercel.app, prodica.onrender.com
+ *   http://localhost:5173/*
+ *   http://127.0.0.1:5173/*
+ *   https://prodica.vercel.app/*
+ *   https://prodica.onrender.com/*
  */
+const measurementId =
+  import.meta.env.VITE_FIREBASE_MEASUREMENT_ID ||
+  FIREBASE_DEFAULTS.measurementId
+
 export const firebaseConfig: FirebaseOptions = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY || FIREBASE_DEFAULTS.apiKey,
   authDomain:
@@ -18,7 +25,5 @@ export const firebaseConfig: FirebaseOptions = {
     import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID ||
     FIREBASE_DEFAULTS.messagingSenderId,
   appId: import.meta.env.VITE_FIREBASE_APP_ID || FIREBASE_DEFAULTS.appId,
-  measurementId:
-    import.meta.env.VITE_FIREBASE_MEASUREMENT_ID ||
-    FIREBASE_DEFAULTS.measurementId,
+  ...(measurementId ? { measurementId } : {}),
 }

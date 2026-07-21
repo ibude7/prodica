@@ -10,6 +10,12 @@ interface ImportMetaEnv {
   readonly VITE_FIREBASE_APP_ID?: string
   readonly VITE_FIREBASE_MEASUREMENT_ID?: string
   readonly VITE_FIREBASE_AI_MODEL?: string
+  /** reCAPTCHA site key from Firebase Console → App Check → Web app */
+  readonly VITE_FIREBASE_APPCHECK_SITE_KEY?: string
+  /** `enterprise` for ReCaptchaEnterpriseProvider; default is reCAPTCHA v3 */
+  readonly VITE_FIREBASE_APPCHECK_PROVIDER?: string
+  /** Registered debug token string, or omit / `true` to print a new one locally */
+  readonly VITE_FIREBASE_APPCHECK_DEBUG_TOKEN?: string
 }
 
 interface ImportMeta {

@@ -9,10 +9,7 @@ import {
 } from '../src/domain/entitySchema'
 import { llmToIdentifiedEntity } from '../src/domain/intelligence'
 import type { IdentifiedEntity, ScanSource } from '../src/domain/types'
-import {
-  DEFAULT_GEMINI_MODEL,
-  FIREBASE_DEFAULTS,
-} from '../src/firebase/defaults'
+import { DEFAULT_GEMINI_MODEL } from '../src/firebase/defaults'
 
 const SYSTEM_PROMPT = `You are Prodica, a universal visual identification system.
 Given a photo (and optional OCR/barcode hints), identify the primary subject.
@@ -30,17 +27,11 @@ Rules:
 - warnings: safety, legal age, allergen, or uncertainty flags when relevant.`
 
 /**
- * Gemini Developer API key resolution for Render/server.
- * Prefer explicit env; fall back to Firebase project web API key (prodica1).
+ * Server-only Gemini keys. Do NOT use the Firebase web key here — HTTP
+ * referrer restrictions block server calls (empty referer).
  */
 function geminiApiKey(): string | undefined {
-  // Prefer Firebase project web key (Gemini Developer API via prodica1),
-  // then explicit Gemini/AI Studio keys, so a denied Studio key on Render
-  // does not override the working Firebase key.
   return (
-    process.env.FIREBASE_API_KEY ||
-    process.env.VITE_FIREBASE_API_KEY ||
-    FIREBASE_DEFAULTS.apiKey ||
     process.env.GOOGLE_GENERATIVE_AI_API_KEY ||
     process.env.GEMINI_API_KEY ||
     process.env.GOOGLE_API_KEY ||
@@ -64,7 +55,7 @@ function resolveModel(): LanguageModel {
   }
 
   throw new Error(
-    'No vision API key configured. Set GEMINI_API_KEY / FIREBASE_API_KEY or AI_GATEWAY_API_KEY on the server.',
+    'No server vision key. Browser Firebase AI should handle identify; for API fallback set GEMINI_API_KEY (no HTTP-referrer restriction) or AI_GATEWAY_API_KEY.',
   )
 }
 

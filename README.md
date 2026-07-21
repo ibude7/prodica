@@ -14,11 +14,16 @@ Universal visual identifier — point the camera at **anything** (food, books, p
 npm install
 ```
 
-### Firebase (client — Analytics + AI Logic)
+### Firebase (client — Analytics + AI Logic + App Check)
 
-1. In [Firebase console](https://console.firebase.google.com/) → project **prodica1**, enable **Firebase AI Logic** and choose the **Gemini Developer API** provider.
-2. Restrict the web API key by HTTP referrer (`localhost`, `prodica.vercel.app`, etc.).
-3. Config is already in [`src/firebase/config.ts`](src/firebase/config.ts) (overridable with `VITE_FIREBASE_*` env vars).
+1. In [Firebase console](https://console.firebase.google.com/) → **prodica1**, enable **AI Logic** (Gemini Developer API).
+2. **App Check** (required — new projects enforce it for AI Logic):
+   - Console → **App Check** → register your **Web** app with **reCAPTCHA** (v3 or Enterprise).
+   - Copy the site key → set `VITE_FIREBASE_APPCHECK_SITE_KEY` (local `.env.local` + Vercel/Render build env).
+   - For **localhost**: open the app, DevTools → Console → copy `AppCheck debug token: "…"`.
+   - App Check → your web app **⋮** → **Manage debug tokens** → add that token.
+3. API key HTTP referrers must include `http://localhost:5173/*` (see below).
+4. Config defaults live in [`src/firebase/defaults.ts`](src/firebase/defaults.ts).
 
 ### Optional server fallback
 
@@ -61,7 +66,18 @@ npm run dev       # Vite only
 - **Render (full stack):** [prodica.onrender.com](https://prodica.onrender.com) — static SPA + API. Client uses Firebase AI; server `/v1/identify` uses the same Firebase `prodica1` Gemini Developer API key by default.
 - **Vercel UI + Render API:** [prodica.vercel.app](https://prodica.vercel.app) calls Render for server fallback.
 
-In Google Cloud credentials, allow HTTP referrers: `localhost/*`, `prodica.vercel.app/*`, `prodica.onrender.com/*`.
+In Google Cloud → Credentials → your Firebase **web** API key → **HTTP referrers**, add exactly:
+
+```
+http://localhost:5173/*
+http://127.0.0.1:5173/*
+https://prodica.vercel.app/*
+https://prodica.onrender.com/*
+```
+
+Vite’s origin is `http://localhost:5173` — a bare `localhost` entry often does **not** match. Wait ~1–5 minutes after saving.
+
+For Render **server** fallback only: create a **second** key with Application restrictions = None (API restriction: Generative Language API) and set `GEMINI_API_KEY` on Render. Do not put HTTP referrers on that server key.
 
 ## Production
 

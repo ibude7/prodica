@@ -9,6 +9,7 @@ import { ENTITY_KINDS, identifiedEntityLlmSchema } from '../domain/entitySchema'
 import { llmToIdentifiedEntity } from '../domain/intelligence'
 import type { IdentifiedEntity, ScanSource } from '../domain/types'
 import { getFirebaseApp } from './app'
+import { initFirebaseAppCheck } from './appCheck'
 import { DEFAULT_GEMINI_MODEL } from './defaults'
 
 const SYSTEM_PROMPT = `You are Prodica, a universal visual identification system.
@@ -517,7 +518,13 @@ export async function identifyWithFirebaseAi(input: {
   ocrText?: string
   barcode?: string
 }): Promise<IdentifiedEntity> {
-  const ai = getAI(getFirebaseApp(), { backend: new GoogleAIBackend() })
+  await initFirebaseAppCheck()
+
+  const ai = getAI(getFirebaseApp(), {
+    backend: new GoogleAIBackend(),
+    // Required when Firebase enforces App Check replay protection for AI Logic
+    useLimitedUseAppCheckTokens: true,
+  })
   const modelName =
     import.meta.env.VITE_FIREBASE_AI_MODEL?.trim() || DEFAULT_GEMINI_MODEL
   const model = getGenerativeModel(ai, {

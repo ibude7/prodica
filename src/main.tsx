@@ -3,11 +3,17 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.tsx'
 import { initFirebaseAnalytics } from './firebase/app'
+import { initFirebaseAppCheck } from './firebase/appCheck'
 
-void initFirebaseAnalytics()
+async function boot() {
+  await initFirebaseAppCheck()
+  void initFirebaseAnalytics()
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <App />
-  </StrictMode>,
-)
+  createRoot(document.getElementById('root')!).render(
+    <StrictMode>
+      <App />
+    </StrictMode>,
+  )
+}
+
+void boot()
