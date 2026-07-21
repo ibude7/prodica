@@ -54,8 +54,9 @@ npm run dev       # Vite only
 |----------|--------|---------|
 | `VITE_FIREBASE_*` | client (optional) | Override Firebase web config / AI model / Vertex location |
 | `GOOGLE_CLOUD_PROJECT` | server | Vertex project (default `prodica1`) |
-| `GOOGLE_CLOUD_LOCATION` | server | Vertex region (default `us-central1`) |
-| `GEMINI_MODEL` | server (optional) | Gemini model id (default `gemini-2.5-flash`) |
+| `GOOGLE_CLOUD_LOCATION` | server | Vertex region (default `global` for 3.5 Flash) |
+| `GEMINI_MODEL` | server (optional) | Primary Gemini model (default `gemini-3.5-flash`) |
+| `GEMINI_FALLBACK_MODEL` | server (optional) | Fallback model (default `gemini-2.5-flash`) |
 | `GOOGLE_APPLICATION_CREDENTIALS` | server | Path to Vertex service-account JSON |
 | `GEMINI_API_KEY` | server | Optional Gemini Developer API fallback (usually blocked) |
 | `AI_GATEWAY_API_KEY` | server | Alternative server fallback via Vercel AI Gateway |

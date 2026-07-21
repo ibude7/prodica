@@ -9,8 +9,24 @@ export const FIREBASE_DEFAULTS = {
   measurementId: 'G-6JY2FCJG3Z',
 } as const
 
-/** Vertex AI Gemini model used by Firebase AI Logic + server fallback */
-export const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash'
+/** Primary Vertex AI Gemini model */
+export const DEFAULT_GEMINI_MODEL = 'gemini-3.5-flash'
 
-/** Vertex AI region for Firebase AI Logic + server */
-export const DEFAULT_VERTEX_LOCATION = 'us-central1'
+/** Used when the primary model is unavailable in the region / project */
+export const FALLBACK_GEMINI_MODEL = 'gemini-2.5-flash'
+
+/**
+ * Vertex location. Prefer `global` so gemini-3.5-flash is reachable;
+ * us-central1 does not host 3.5 Flash.
+ */
+export const DEFAULT_VERTEX_LOCATION = 'global'
+
+/** Ordered model ids to try (primary, then fallback; de-duped). */
+export function geminiModelCandidates(
+  primary?: string | null,
+  fallback?: string | null,
+): string[] {
+  const first = primary?.trim() || DEFAULT_GEMINI_MODEL
+  const second = fallback?.trim() || FALLBACK_GEMINI_MODEL
+  return first === second ? [first] : [first, second]
+}

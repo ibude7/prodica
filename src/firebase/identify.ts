@@ -11,7 +11,10 @@ import { llmToIdentifiedEntity } from '../domain/intelligence'
 import type { IdentifiedEntity, ScanSource } from '../domain/types'
 import { getFirebaseApp } from './app'
 import { initFirebaseAppCheck } from './appCheck'
-import { DEFAULT_GEMINI_MODEL, DEFAULT_VERTEX_LOCATION } from './defaults'
+import {
+  DEFAULT_VERTEX_LOCATION,
+  geminiModelCandidates,
+} from './defaults'
 
 const SYSTEM_PROMPT = `You are Prodica, a universal visual identification system.
 Given a photo (and optional OCR/barcode hints), identify the primary subject.
@@ -288,16 +291,10 @@ export async function identifyWithFirebaseAi(input: {
     // Required when Firebase enforces App Check replay protection for AI Logic
     useLimitedUseAppCheckTokens: true,
   })
-  const modelName =
-    import.meta.env.VITE_FIREBASE_AI_MODEL?.trim() || DEFAULT_GEMINI_MODEL
-  const model = getGenerativeModel(ai, {
-    model: modelName,
-    systemInstruction: SYSTEM_PROMPT,
-    generationConfig: {
-      responseMimeType: 'application/json',
-      responseSchema: entityResponseSchema,
-    },
-  })
+  const models = geminiModelCandidates(
+    import.meta.env.VITE_FIREBASE_AI_MODEL,
+    import.meta.env.VITE_FIREBASE_AI_FALLBACK_MODEL,
+  )
 
   const hintParts: string[] = [
     'Identify the primary subject in this image and return structured JSON.',
@@ -310,28 +307,50 @@ export async function identifyWithFirebaseAi(input: {
   }
 
   const imagePart = await blobToInlinePart(input.imageBlob)
-  const result = await model.generateContent([hintParts.join('\n\n'), imagePart])
-  const text = result.response.text()
-  if (!text?.trim()) {
-    throw new Error('Firebase AI returned an empty response.')
+  const prompt = [hintParts.join('\n\n'), imagePart] as const
+
+  let lastError: unknown
+  for (const modelName of models) {
+    try {
+      const model = getGenerativeModel(ai, {
+        model: modelName,
+        systemInstruction: SYSTEM_PROMPT,
+        generationConfig: {
+          responseMimeType: 'application/json',
+          responseSchema: entityResponseSchema,
+        },
+      })
+      const result = await model.generateContent([...prompt])
+      const text = result.response.text()
+      if (!text?.trim()) {
+        throw new Error('Firebase AI returned an empty response.')
+      }
+
+      let parsedJson: unknown
+      try {
+        parsedJson = JSON.parse(text)
+      } catch {
+        throw new Error('Firebase AI returned non-JSON output.')
+      }
+
+      const coerced = coerceLlmPayload(parsedJson)
+      const validated = identifiedEntityLlmSchema.safeParse(coerced)
+      if (!validated.success) {
+        throw new Error(
+          `Firebase AI JSON failed validation: ${validated.error.issues[0]?.message ?? 'invalid'}`,
+        )
+      }
+
+      const source: ScanSource =
+        input.barcode || input.ocrText?.trim() ? 'combined' : 'visual'
+      return llmToIdentifiedEntity(validated.data, source)
+    } catch (err) {
+      lastError = err
+      // Try next model (e.g. 3.5 unavailable → 2.5)
+    }
   }
 
-  let parsedJson: unknown
-  try {
-    parsedJson = JSON.parse(text)
-  } catch {
-    throw new Error('Firebase AI returned non-JSON output.')
-  }
-
-  const coerced = coerceLlmPayload(parsedJson)
-  const validated = identifiedEntityLlmSchema.safeParse(coerced)
-  if (!validated.success) {
-    throw new Error(
-      `Firebase AI JSON failed validation: ${validated.error.issues[0]?.message ?? 'invalid'}`,
-    )
-  }
-
-  const source: ScanSource =
-    input.barcode || input.ocrText?.trim() ? 'combined' : 'visual'
-  return llmToIdentifiedEntity(validated.data, source)
+  throw lastError instanceof Error
+    ? lastError
+    : new Error('Firebase AI identify failed for all models.')
 }

@@ -10,7 +10,9 @@ interface ImportMetaEnv {
   readonly VITE_FIREBASE_APP_ID?: string
   readonly VITE_FIREBASE_MEASUREMENT_ID?: string
   readonly VITE_FIREBASE_AI_MODEL?: string
-  /** Vertex AI region for Firebase AI Logic (default us-central1) */
+  /** Fallback model when primary is unavailable (default gemini-2.5-flash) */
+  readonly VITE_FIREBASE_AI_FALLBACK_MODEL?: string
+  /** Vertex AI region for Firebase AI Logic (default global) */
   readonly VITE_FIREBASE_VERTEX_LOCATION?: string
   /** reCAPTCHA site key from Firebase Console → App Check → Web app */
   readonly VITE_FIREBASE_APPCHECK_SITE_KEY?: string

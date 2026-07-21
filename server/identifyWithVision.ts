@@ -14,9 +14,9 @@ import {
 import { llmToIdentifiedEntity } from '../src/domain/intelligence'
 import type { IdentifiedEntity, ScanSource } from '../src/domain/types'
 import {
-  DEFAULT_GEMINI_MODEL,
   DEFAULT_VERTEX_LOCATION,
   FIREBASE_DEFAULTS,
+  geminiModelCandidates,
 } from '../src/firebase/defaults'
 
 const SYSTEM_PROMPT = `You are Prodica, a universal visual identification system.
@@ -63,11 +63,11 @@ function vertexLocation(): string {
   )
 }
 
-function modelId(): string {
-  return (
-    process.env.GEMINI_MODEL?.trim() ||
-    process.env.VITE_FIREBASE_AI_MODEL?.trim() ||
-    DEFAULT_GEMINI_MODEL
+function modelIds(): string[] {
+  return geminiModelCandidates(
+    process.env.GEMINI_MODEL || process.env.VITE_FIREBASE_AI_MODEL,
+    process.env.GEMINI_FALLBACK_MODEL ||
+      process.env.VITE_FIREBASE_AI_FALLBACK_MODEL,
   )
 }
 
@@ -86,11 +86,9 @@ function vertexAuthOptions() {
     process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON ||
     process.env.GOOGLE_SERVICE_ACCOUNT_JSON
   ) {
-    // ADC / SA JSON (file path or written by ensureGoogleApplicationCredentials)
     return undefined
   }
 
-  // Local only: mint tokens via logged-in gcloud CLI (not available on Render).
   try {
     gcloudAccessToken()
   } catch {
@@ -101,11 +99,7 @@ function vertexAuthOptions() {
   return { authClient: client }
 }
 
-/**
- * Prefer Vertex AI (billing-enabled). Falls back to Gemini Developer API key,
- * then Vercel AI Gateway.
- */
-function resolveModel(): LanguageModel {
+function resolveModel(modelId: string): LanguageModel {
   const useVertex =
     process.env.VERTEX_AI !== '0' &&
     process.env.GEMINI_PROVIDER?.trim() !== 'google-ai'
@@ -116,13 +110,13 @@ function resolveModel(): LanguageModel {
       location: vertexLocation(),
       googleAuthOptions: vertexAuthOptions(),
     })
-    return vertex(modelId())
+    return vertex(modelId)
   }
 
   const geminiKey = geminiApiKey()
   if (geminiKey) {
     const google = createGoogleGenerativeAI({ apiKey: geminiKey })
-    return google(modelId())
+    return google(modelId)
   }
 
   if (process.env.AI_GATEWAY_API_KEY || process.env.VERCEL_OIDC_TOKEN) {
@@ -134,14 +128,19 @@ function resolveModel(): LanguageModel {
   )
 }
 
+function shouldTryNextModel(err: unknown): boolean {
+  const message = err instanceof Error ? err.message : String(err)
+  return /not found|NOT_FOUND|does not have access|unavailable|404|model/i.test(
+    message,
+  )
+}
+
 export async function identifyWithVision(input: {
   imageBuffer: Buffer
   mediaType: string
   ocrText?: string
   barcode?: string
 }): Promise<IdentifiedEntity> {
-  const model = resolveModel()
-
   const hintParts: string[] = [
     'Identify the primary subject in this image and return structured JSON matching the Prodica entity schema (kind, name, summary, confidence, tags, warnings, scanNotes, facets).',
   ]
@@ -153,45 +152,63 @@ export async function identifyWithVision(input: {
     hintParts.push(`OCR text hint:\n${clipped}`)
   }
 
-  const result = await generateText({
-    model,
-    system: SYSTEM_PROMPT,
-    messages: [
-      {
-        role: 'user',
-        content: [
-          { type: 'image', image: input.imageBuffer, mediaType: input.mediaType },
-          { type: 'text', text: hintParts.join('\n\n') },
-        ],
-      },
-    ],
-  })
+  const messages = [
+    {
+      role: 'user' as const,
+      content: [
+        {
+          type: 'image' as const,
+          image: input.imageBuffer,
+          mediaType: input.mediaType,
+        },
+        { type: 'text' as const, text: hintParts.join('\n\n') },
+      ],
+    },
+  ]
 
-  const text = result.text?.trim()
-  if (!text) {
-    throw new Error('Model returned no structured identification.')
+  let lastError: unknown
+  for (const modelId of modelIds()) {
+    try {
+      const result = await generateText({
+        model: resolveModel(modelId),
+        system: SYSTEM_PROMPT,
+        messages,
+      })
+
+      const text = result.text?.trim()
+      if (!text) {
+        throw new Error('Model returned no structured identification.')
+      }
+
+      let parsed: unknown
+      try {
+        const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/)
+        parsed = JSON.parse(fenced?.[1]?.trim() || text)
+      } catch {
+        throw new Error('Model returned non-JSON identification.')
+      }
+
+      const coerced = coerceLlmPayload(parsed)
+      const validated = identifiedEntityLlmSchema.safeParse(coerced)
+      if (!validated.success) {
+        throw new Error(
+          `Identification failed schema: ${validated.error.issues[0]?.message ?? 'invalid'}`,
+        )
+      }
+
+      const normalized = ensureId(validated.data, input.imageBuffer)
+      const source: ScanSource =
+        input.barcode || input.ocrText?.trim() ? 'combined' : 'visual'
+      return llmToIdentifiedEntity(normalized, source)
+    } catch (err) {
+      lastError = err
+      if (!shouldTryNextModel(err)) break
+    }
   }
 
-  let parsed: unknown
-  try {
-    const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/)
-    parsed = JSON.parse(fenced?.[1]?.trim() || text)
-  } catch {
-    throw new Error('Model returned non-JSON identification.')
-  }
-
-  const coerced = coerceLlmPayload(parsed)
-  const validated = identifiedEntityLlmSchema.safeParse(coerced)
-  if (!validated.success) {
-    throw new Error(
-      `Identification failed schema: ${validated.error.issues[0]?.message ?? 'invalid'}`,
-    )
-  }
-
-  const normalized = ensureId(validated.data, input.imageBuffer)
-  const source: ScanSource =
-    input.barcode || input.ocrText?.trim() ? 'combined' : 'visual'
-  return llmToIdentifiedEntity(normalized, source)
+  throw lastError instanceof Error
+    ? lastError
+    : new Error('Identification failed for all models.')
 }
 
 function ensureId(raw: IdentifiedEntityLlm, buf: Buffer): IdentifiedEntityLlm {
