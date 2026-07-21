@@ -1,3 +1,5 @@
+import type { EntityKind, IdentifiedEntityLlm } from './entitySchema'
+
 /** How a field was obtained — shown in UI for transparency */
 export type DataProvenance = 'confirmed' | 'inferred'
 
@@ -6,57 +8,35 @@ export type ScanSource = 'barcode' | 'ocr' | 'visual' | 'combined'
 
 export type ConfidenceLevel = 'high' | 'medium' | 'low'
 
-export type ProductCategory =
-  | 'wine'
-  | 'food'
-  | 'medicine'
-  | 'supplements'
-  | 'cosmetics'
-  | 'household'
-  | 'fragrance'
-  | 'other'
+export type { EntityKind }
 
 export interface NutritionFact {
   label: string
   value: string
 }
 
-/** Single normalized product view for the result screen */
-export interface ProductResult {
-  id: string
-  name: ProductField<string>
-  brand: ProductField<string>
-  category: ProductField<ProductCategory>
-  origin: ProductField<string>
-  ingredients: ProductField<string>
-  /** Package size / net contents */
-  contents: ProductField<string>
-  nutritionFacts: ProductField<NutritionFact[]>
-  /** Alcohol by volume (0–100), mainly wine & some drinks */
-  alcoholPercent: ProductField<number>
-  warnings: ProductField<string[]>
-  storage: ProductField<string>
-  pairings: ProductField<string[]>
-  doNotPair: ProductField<string[]>
-  /** Wine: region / appellation */
-  region?: ProductField<string>
-  /** Wine: dominant grape or blend note */
-  grapeVariety?: ProductField<string>
-  /** Medicine / supplements */
-  activeIngredients?: ProductField<string[]>
-  dosageWarnings?: ProductField<string>
-  /** 0–1 overall match confidence */
-  confidence: number
-  confidenceLevel: ConfidenceLevel
-  source: ScanSource
-  /** Human-readable trace for debugging / power users */
-  scanNotes?: string
-}
-
-export interface ProductField<T> {
+export interface EntityField<T> {
   value: T | null
   provenance: DataProvenance
 }
+
+/** Normalized entity for the result screen (LLM or structured DB) */
+export type IdentifiedEntity = {
+  [K in EntityKind]: {
+    id: string
+    kind: K
+    name: EntityField<string>
+    subtitle: EntityField<string>
+    summary: string
+    confidence: number
+    confidenceLevel: ConfidenceLevel
+    source: ScanSource
+    tags: string[]
+    warnings: string[]
+    scanNotes?: string
+    facets: Extract<IdentifiedEntityLlm, { kind: K }>['facets']
+  }
+}[EntityKind]
 
 /** API / service layer: one of several lookup strategies */
 export type LookupRequest =
@@ -72,7 +52,7 @@ export interface PipelineStep {
 export type ScanOutcome =
   | {
       status: 'success'
-      result: ProductResult
+      result: IdentifiedEntity
       steps: PipelineStep[]
     }
   | {
@@ -85,3 +65,8 @@ export type ScanOutcome =
       message: string
       steps?: PipelineStep[]
     }
+
+/** @deprecated Use IdentifiedEntity — kept only for transitional imports */
+export type ProductResult = IdentifiedEntity
+export type ProductCategory = EntityKind
+export type ProductField<T> = EntityField<T>

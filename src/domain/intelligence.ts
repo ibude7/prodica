@@ -1,19 +1,13 @@
 import type {
   ConfidenceLevel,
   DataProvenance,
+  IdentifiedEntity,
   LookupRequest,
-  NutritionFact,
-  ProductField,
-  ProductResult,
   ScanSource,
 } from './types'
+import type { IdentifiedEntityLlm } from './entitySchema'
 import type { CatalogRecord } from '../mocks/catalog'
 
-function field<T>(value: T | null, provenance: DataProvenance): ProductField<T> {
-  return { value, provenance }
-}
-
-/** Map catalog quality + match path to 0–1 confidence */
 export function scoreConfidence(input: {
   request: LookupRequest
   matchScore: number
@@ -36,17 +30,32 @@ export function toConfidenceLevel(score: number): ConfidenceLevel {
   return 'low'
 }
 
-function provenanceForField(
-  base: DataProvenance,
-  fieldKey: string,
-): DataProvenance {
-  const inferredKeys = new Set(['pairings', 'doNotPair'])
-  if (inferredKeys.has(fieldKey) && base === 'confirmed') return 'inferred'
-  return base
+/** Wrap LLM structured output into the UI entity model */
+export function llmToIdentifiedEntity(
+  raw: IdentifiedEntityLlm,
+  source: ScanSource = 'visual',
+): IdentifiedEntity {
+  const provenance: DataProvenance =
+    source === 'barcode' ? 'confirmed' : 'inferred'
+  const conf = Math.min(1, Math.max(0, raw.confidence))
+  return {
+    id: raw.id,
+    kind: raw.kind,
+    name: { value: raw.name, provenance },
+    subtitle: { value: raw.subtitle, provenance },
+    summary: raw.summary,
+    confidence: conf,
+    confidenceLevel: toConfidenceLevel(conf),
+    source,
+    tags: raw.tags,
+    warnings: raw.warnings,
+    scanNotes: raw.scanNotes ?? undefined,
+    facets: raw.facets,
+  } as IdentifiedEntity
 }
 
-/** Build a UI model from a catalog row and intelligence context */
-export function catalogToProductResult(
+/** Build an IdentifiedEntity from a mock catalog row */
+export function catalogToIdentifiedEntity(
   record: CatalogRecord,
   ctx: {
     source: ScanSource
@@ -54,88 +63,88 @@ export function catalogToProductResult(
     confidence: number
     scanNotes?: string
   },
-): ProductResult {
+): IdentifiedEntity {
   const bp = ctx.baseProvenance
   const conf = ctx.confidence
   const level = toConfidenceLevel(conf)
 
-  const nutrition: ProductField<{ label: string; value: string }[]> = field(
-    record.nutritionFacts.length ? record.nutritionFacts : null,
-    provenanceForField(bp, 'nutritionFacts'),
-  )
+  if (record.category === 'wine' || record.alcoholPercent != null) {
+    return {
+      id: record.id,
+      kind: 'alcohol',
+      name: { value: record.name, provenance: bp },
+      subtitle: { value: record.brand, provenance: bp },
+      summary: `${record.name} — ${record.category} from ${record.origin}.`,
+      confidence: conf,
+      confidenceLevel: level,
+      source: ctx.source,
+      tags: [record.category, record.origin].filter(Boolean),
+      warnings: record.warnings,
+      scanNotes: ctx.scanNotes,
+      facets: {
+        abv: record.alcoholPercent,
+        style: record.category === 'wine' ? 'Wine' : null,
+        region: record.region ?? null,
+        grapesOrGrains: record.grapeVariety ?? null,
+        tastingNotes: [],
+        pairings: record.pairings,
+        servingTemp: null,
+        contents: record.contents || null,
+        origin: record.origin || null,
+        ingredients: record.ingredients || null,
+      },
+    }
+  }
 
-  const pairings = field(
-    record.pairings.length ? record.pairings : null,
-    'inferred',
-  )
-  const doNotPair = field(
-    record.doNotPair.length ? record.doNotPair : null,
-    'inferred',
-  )
+  if (record.category === 'medicine') {
+    return {
+      id: record.id,
+      kind: 'medicine',
+      name: { value: record.name, provenance: bp },
+      subtitle: { value: record.brand, provenance: bp },
+      summary: `${record.name} (${record.brand}). Informational only — not medical advice.`,
+      confidence: conf,
+      confidenceLevel: level,
+      source: ctx.source,
+      tags: ['medicine'],
+      warnings: record.warnings,
+      scanNotes: ctx.scanNotes,
+      facets: {
+        activeIngredients: record.activeIngredients ?? [],
+        dosage: record.dosageWarnings ?? null,
+        contraindications: record.doNotPair,
+        sideEffects: [],
+        storage: record.storage || null,
+        form: null,
+        contents: record.contents || null,
+      },
+    }
+  }
 
-  const result: ProductResult = {
+  return {
     id: record.id,
-    name: field(record.name, bp),
-    brand: field(record.brand, bp),
-    category: field(record.category, bp),
-    origin: field(record.origin, bp),
-    ingredients: field(record.ingredients, bp),
-    contents: field(record.contents, bp),
-    nutritionFacts: nutrition,
-    alcoholPercent: field(record.alcoholPercent, bp),
-    warnings: field(record.warnings.length ? record.warnings : null, bp),
-    storage: field(record.storage, bp),
-    pairings,
-    doNotPair,
+    kind: 'food',
+    name: { value: record.name, provenance: bp },
+    subtitle: { value: record.brand, provenance: bp },
+    summary: `${record.name} by ${record.brand}.`,
     confidence: conf,
     confidenceLevel: level,
     source: ctx.source,
+    tags: [record.category, record.origin].filter(Boolean),
+    warnings: record.warnings,
     scanNotes: ctx.scanNotes,
-  }
-
-  if (record.region) {
-    result.region = field(record.region, bp)
-  }
-  if (record.grapeVariety) {
-    result.grapeVariety = field(record.grapeVariety, bp)
-  }
-  if (record.activeIngredients?.length) {
-    result.activeIngredients = field(record.activeIngredients, bp)
-  }
-  if (record.dosageWarnings) {
-    result.dosageWarnings = field(record.dosageWarnings, bp)
-  }
-
-  return result
-}
-
-/** Low-confidence “best guess” when nothing matches the catalog */
-export function buildFallbackGuess(input: {
-  label: string
-  fingerprint: string
-}): ProductResult {
-  const conf = 0.22 + (Number.parseInt(input.fingerprint.slice(0, 4), 16) % 12) / 100
-  return {
-    id: `guess-${input.fingerprint.slice(0, 6)}`,
-    name: field(`Possible product: ${input.label}`, 'inferred'),
-    brand: field<string>(null, 'inferred'),
-    category: field('other', 'inferred'),
-    origin: field<string>(null, 'inferred'),
-    ingredients: field<string>(null, 'inferred'),
-    contents: field<string>(null, 'inferred'),
-    nutritionFacts: field<NutritionFact[]>(null, 'inferred'),
-    alcoholPercent: field<number>(null, 'inferred'),
-    warnings: field(
-      ['Unverified match — do not rely on this for allergies or safety.'],
-      'inferred',
-    ),
-    storage: field<string>(null, 'inferred'),
-    pairings: field<string[]>(null, 'inferred'),
-    doNotPair: field<string[]>(null, 'inferred'),
-    confidence: conf,
-    confidenceLevel: 'low',
-    source: 'visual',
-    scanNotes:
-      'No strong match in the mock catalog. Showing a visual-classification label only.',
+    facets: {
+      ingredients: record.ingredients || null,
+      allergens: [],
+      nutritionFacts: record.nutritionFacts,
+      contents: record.contents || null,
+      origin: record.origin || null,
+      storage: record.storage || null,
+      pairings: record.pairings,
+      doNotPair: record.doNotPair,
+    },
   }
 }
+
+/** @deprecated Use catalogToIdentifiedEntity */
+export const catalogToProductResult = catalogToIdentifiedEntity

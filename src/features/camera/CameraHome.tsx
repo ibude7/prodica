@@ -98,11 +98,11 @@ export function CameraHome({ onCapture }: { onCapture: (blob: Blob) => void }) {
           disabled={status !== 'ready'}
           onClick={capture}
         >
-          Scan product
+          Identify
         </button>
         <p className="camera-hint">
-          Point at the label. We try barcode first, then OCR, then visual
-          fallback.
+          Point at anything — food, books, pets, cars, art, and more. We try
+          barcode and OCR for packaged goods, then vision for everything else.
         </p>
       </div>
     </div>

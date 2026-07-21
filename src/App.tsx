@@ -1,9 +1,9 @@
 import { useCallback, useMemo, useState } from 'react'
-import type { ProductResult, ScanOutcome } from './domain/types'
-import { applyUserCorrections } from './domain/mergeProduct'
+import type { IdentifiedEntity, ScanOutcome } from './domain/types'
+import { applyUserCorrections } from './domain/mergeEntity'
 import { runScanPipeline } from './services/scanPipeline'
 import { CameraHome } from './features/camera/CameraHome'
-import { ProductResultView } from './features/product/ProductResultView'
+import { EntityResultView } from './features/entity/EntityResultView'
 import { LoadingOverlay } from './components/LoadingOverlay'
 import { StateBanner } from './components/StateBanner'
 
@@ -12,12 +12,13 @@ type Phase = 'camera' | 'loading' | 'result'
 export default function App() {
   const [phase, setPhase] = useState<Phase>('camera')
   const [outcome, setOutcome] = useState<ScanOutcome | null>(null)
-  const [corrections, setCorrections] = useState<{ name?: string; brand?: string }>(
-    {},
-  )
+  const [corrections, setCorrections] = useState<{
+    name?: string
+    subtitle?: string
+  }>({})
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
-  const displayProduct = useMemo((): ProductResult | null => {
+  const displayEntity = useMemo((): IdentifiedEntity | null => {
     if (!outcome || outcome.status !== 'success') return null
     return applyUserCorrections(outcome.result, corrections)
   }, [outcome, corrections])
@@ -50,8 +51,8 @@ export default function App() {
     setErrorMessage(null)
   }, [])
 
-  const handleApplyCorrection = useCallback((name: string, brand: string) => {
-    setCorrections({ name, brand })
+  const handleApplyCorrection = useCallback((name: string, subtitle: string) => {
+    setCorrections({ name, subtitle })
   }, [])
 
   return (
@@ -75,19 +76,19 @@ export default function App() {
         ) : null}
 
         {phase === 'loading' ? (
-          <LoadingOverlay label="Reading barcode, OCR, and visual signals…" />
+          <LoadingOverlay label="Identifying — barcode, OCR, then vision…" />
         ) : null}
 
         {phase === 'result' && outcome ? (
-          <ProductResultView
+          <EntityResultView
             key={
-              displayProduct
-                ? `${displayProduct.id}:${displayProduct.name.value ?? ''}:${displayProduct.brand.value ?? ''}`
+              displayEntity
+                ? `${displayEntity.id}:${displayEntity.name.value ?? ''}:${displayEntity.subtitle.value ?? ''}`
                 : outcome.status === 'no_match'
                   ? 'no-match'
                   : 'result'
             }
-            product={displayProduct}
+            entity={displayEntity}
             steps={outcome.status !== 'error' ? outcome.steps : []}
             noMatchHint={outcome.status === 'no_match' ? outcome.hint : undefined}
             onRetake={handleRetake}

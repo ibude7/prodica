@@ -1,12 +1,13 @@
-import type { ProductCategory } from '../domain/types'
+/** Internal demo catalog — optional fast path; vision is primary */
 
-/** Internal record — all optional fields for category-specific data */
+export type CatalogCategory = 'wine' | 'food' | 'medicine'
+
 export interface CatalogRecord {
   id: string
   barcodes: string[]
   nameTokens: string[]
   visualLabels: string[]
-  category: ProductCategory
+  category: CatalogCategory
   name: string
   brand: string
   origin: string
@@ -82,7 +83,8 @@ export const CATALOG: CatalogRecord[] = [
     name: 'PainRelief Extra (example)',
     brand: 'PharmaCo Demo',
     origin: 'Poland',
-    ingredients: 'Tablet core: lactose, starch. Film coat: hypromellose, titanium dioxide.',
+    ingredients:
+      'Tablet core: lactose, starch. Film coat: hypromellose, titanium dioxide.',
     contents: '24 tablets',
     nutritionFacts: [],
     alcoholPercent: null,
@@ -95,6 +97,7 @@ export const CATALOG: CatalogRecord[] = [
     pairings: [],
     doNotPair: ['Alcohol — may increase liver risk when combined with paracetamol'],
     activeIngredients: ['Paracetamol 500 mg per tablet'],
-    dosageWarnings: 'Max 8 tablets in 24 hours for adults unless prescribed otherwise.',
+    dosageWarnings:
+      'Max 8 tablets in 24 hours for adults unless prescribed otherwise.',
   },
 ]

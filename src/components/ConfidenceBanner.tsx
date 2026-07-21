@@ -38,7 +38,9 @@ export function ConfidenceBanner(props: {
           ? 'Treat details as unverified until you confirm them.'
           : props.level === 'medium'
             ? 'Some fields may still need confirmation.'
-            : 'Strong match against mock catalog data.'}
+            : props.source === 'barcode'
+              ? 'Strong barcode match from Open Food Facts.'
+              : 'High-confidence identification.'}
       </p>
     </div>
   )
