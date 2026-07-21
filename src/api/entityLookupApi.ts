@@ -1,9 +1,16 @@
 import type { IdentifiedEntity, LookupRequest } from '../domain/types'
+import { normalizeIdentifiedEntity } from '../domain/normalizeEntity'
 import {
   lookupOpenFoodFactsByBarcode,
   searchOpenFoodFactsByText,
 } from '../services/openFoodFacts'
 import { apiUrl } from './apiBase'
+
+function normalizeOrNull(
+  entity: IdentifiedEntity | null | undefined,
+): IdentifiedEntity | null {
+  return entity ? normalizeIdentifiedEntity(entity) : null
+}
 
 async function lookupFromOpenFoodFacts(
   request: LookupRequest,
@@ -38,9 +45,9 @@ export async function fetchEntityLookup(
       entity?: IdentifiedEntity | null
       product?: IdentifiedEntity | null
     }
-    return data.entity ?? data.product ?? null
+    return normalizeOrNull(data.entity ?? data.product ?? null)
   } catch {
-    return lookupFromOpenFoodFacts(request)
+    return normalizeOrNull(await lookupFromOpenFoodFacts(request))
   }
 }
 

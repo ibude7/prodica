@@ -1,5 +1,6 @@
 import { apiUrl } from '../api/apiBase'
 import { identifyWithFirebaseAi } from '../firebase/identify'
+import { normalizeIdentifiedEntity } from '../domain/normalizeEntity'
 import type { IdentifiedEntity, PipelineStep } from '../domain/types'
 
 export interface IdentifyHints {
@@ -32,7 +33,7 @@ async function identifyViaServer(
       }
     }
     const data = (await res.json()) as { entity: IdentifiedEntity }
-    return { entity: data.entity }
+    return { entity: normalizeIdentifiedEntity(data.entity) }
   } catch (e) {
     return {
       entity: null,
@@ -55,7 +56,7 @@ async function identifyViaFirebase(
       ocrText: hints.ocrText,
       barcode: hints.barcode,
     })
-    return { entity }
+    return { entity: normalizeIdentifiedEntity(entity) }
   } catch (e) {
     return {
       entity: null,

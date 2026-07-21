@@ -68,7 +68,23 @@ export function EntityResultView(props: {
     )
   }
 
-  if (!props.entity) return null
+  if (!props.entity) {
+    return (
+      <div className="result-screen fade-in">
+        <header className="result-header">
+          <h1 className="result-title">No result</h1>
+          <button type="button" className="btn btn--ghost" onClick={props.onRetake}>
+            Retake photo
+          </button>
+        </header>
+        <StateBanner
+          kind="warn"
+          title="Nothing to show"
+          detail={props.noMatchHint ?? 'Identification finished without a displayable result.'}
+        />
+      </div>
+    )
+  }
 
   const e = props.entity
   const showLow = e.confidenceLevel === 'low'
@@ -129,8 +145,8 @@ export function EntityResultView(props: {
 
       <SectionCard title="Reference images">
         <ReferenceGallery
-          images={e.images}
-          subjectName={e.name.value ?? 'result'}
+          images={e.images ?? []}
+          subjectName={e.name?.value ?? 'result'}
         />
       </SectionCard>
 

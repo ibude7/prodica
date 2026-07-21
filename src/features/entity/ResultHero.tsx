@@ -12,9 +12,10 @@ export function ResultHero(props: {
   actions?: ReactNode
 }) {
   const { entity } = props
-  const bestRef = entity.images[0]
+  const images = entity.images ?? []
+  const bestRef = images[0]
   const captured = entity.capturedPhoto
-  const confPct = Math.round(entity.confidence * 100)
+  const confPct = Math.round((entity.confidence ?? 0) * 100)
 
   return (
     <header className="result-hero">

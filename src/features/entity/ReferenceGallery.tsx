@@ -25,7 +25,7 @@ export function ReferenceGallery(props: {
 }) {
   const dialogId = useId()
   const [active, setActive] = useState<number | null>(null)
-  const images = props.images
+  const images = props.images ?? []
 
   const close = useCallback(() => setActive(null), [])
 

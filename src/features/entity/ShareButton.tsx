@@ -74,7 +74,7 @@ export function ShareButton(props: {
   }, [props])
 
   const downloadCard = useCallback(async () => {
-    const url = props.entity.capturedPhoto || props.entity.images[0]?.url
+    const url = props.entity.capturedPhoto || props.entity.images?.[0]?.url
     if (!url) {
       setStatus('No image to download')
       return

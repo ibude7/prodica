@@ -78,12 +78,12 @@ export function HistoryList(props: {
                   onClick={() => props.onOpen(entry)}
                 >
                   <div className="history-card__thumb">
-                    {entry.thumbDataUrl || entry.entity.images[0]?.url ? (
+                    {entry.thumbDataUrl || entry.entity.images?.[0]?.url ? (
                       <img
                         src={
                           entry.thumbDataUrl ||
-                          entry.entity.images[0]?.thumbUrl ||
-                          entry.entity.images[0]?.url
+                          entry.entity.images?.[0]?.thumbUrl ||
+                          entry.entity.images?.[0]?.url
                         }
                         alt=""
                         width={120}

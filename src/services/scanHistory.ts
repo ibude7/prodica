@@ -58,7 +58,10 @@ async function withStore<T>(
 }
 
 async function makeThumb(entity: IdentifiedEntity): Promise<string | undefined> {
-  const src = entity.capturedPhoto || entity.images[0]?.thumbUrl || entity.images[0]?.url
+  const src =
+    entity.capturedPhoto ||
+    entity.images?.[0]?.thumbUrl ||
+    entity.images?.[0]?.url
   if (!src) return undefined
   if (src.startsWith('data:')) return src.slice(0, 200_000)
 
@@ -100,7 +103,7 @@ export async function addScanToHistory(
     capturedPhoto: entity.capturedPhoto?.startsWith('data:')
       ? entity.capturedPhoto
       : undefined,
-    images: entity.images.map((img) => ({
+    images: (entity.images ?? []).map((img) => ({
       ...img,
       // Keep remote URLs; drop blob: URLs
       url: img.url.startsWith('blob:') ? img.thumbUrl || img.url : img.url,

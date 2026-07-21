@@ -10,8 +10,8 @@ export function HeroFields({ entity }: { entity: IdentifiedEntity }) {
         <div className="hero-fields">
           <FieldRow label="Contents" value={f.contents} />
           <FieldRow label="Origin" value={f.origin} />
-          {f.allergens.length ? <ListBlock items={f.allergens} /> : null}
-          {f.nutritionFacts.length ? (
+          {f.allergens?.length ? <ListBlock items={f.allergens} /> : null}
+          {f.nutritionFacts?.length ? (
             <LabelValueGrid rows={f.nutritionFacts.slice(0, 4)} />
           ) : null}
         </div>

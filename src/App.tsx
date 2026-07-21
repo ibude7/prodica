@@ -4,6 +4,7 @@ import { applyUserCorrections } from './domain/mergeEntity'
 import { runScanPipeline } from './services/scanPipeline'
 import { addScanToHistory } from './services/scanHistory'
 import type { ScanHistoryEntry } from './services/scanHistory'
+import { normalizeIdentifiedEntity } from './domain/normalizeEntity'
 import { withEnrichedImages } from './services/mediaEnrichment'
 import { CameraHome } from './features/camera/CameraHome'
 import { EntityResultView } from './features/entity/EntityResultView'
@@ -27,7 +28,10 @@ export default function App() {
 
   const displayEntity = useMemo((): IdentifiedEntity | null => {
     if (!outcome || outcome.status !== 'success') return null
-    return applyUserCorrections(outcome.result, corrections)
+    return applyUserCorrections(
+      normalizeIdentifiedEntity(outcome.result),
+      corrections,
+    )
   }, [outcome, corrections])
 
   useEffect(() => {

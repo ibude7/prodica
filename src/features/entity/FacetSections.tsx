@@ -13,7 +13,7 @@ export function FacetSections({ entity }: { entity: IdentifiedEntity }) {
             <FieldRow label="Contents" value={f.contents} />
             <FieldRow label="Origin" value={f.origin} />
             <FieldRow label="Storage" value={f.storage} />
-            {f.allergens.length ? (
+            {f.allergens?.length ? (
               <div className="stack">
                 <span className="field-label">Allergens</span>
                 <ListBlock items={f.allergens} />
@@ -22,19 +22,19 @@ export function FacetSections({ entity }: { entity: IdentifiedEntity }) {
           </SectionCard>
           <SectionCard title="Nutrition">
             <LabelValueGrid rows={f.nutritionFacts} />
-            {!f.nutritionFacts.length ? (
+            {!f.nutritionFacts?.length ? (
               <p className="muted">No nutrition facts listed.</p>
             ) : null}
           </SectionCard>
           <SectionCard title="Pairings" variant="muted">
             <ListBlock items={f.pairings} />
-            {f.doNotPair.length ? (
+            {f.doNotPair?.length ? (
               <div className="stack">
                 <span className="field-label">Caution</span>
                 <ListBlock items={f.doNotPair} />
               </div>
             ) : null}
-            {!f.pairings.length && !f.doNotPair.length ? (
+            {!f.pairings?.length && !f.doNotPair?.length ? (
               <p className="muted">No pairing tips.</p>
             ) : null}
           </SectionCard>
@@ -360,7 +360,10 @@ export function FacetSections({ entity }: { entity: IdentifiedEntity }) {
       const f = entity.facets
       return (
         <SectionCard title="Details">
-          <FieldRow label="Also known as" value={f.commonNames.join(', ') || null} />
+          <FieldRow
+            label="Also known as"
+            value={f.commonNames?.join(', ') || null}
+          />
           <FieldRow label="Difficulty" value={f.difficulty} />
           <FieldRow label="Description" value={f.description} />
           <div className="stack">

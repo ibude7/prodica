@@ -4,6 +4,7 @@ import type {
   ScanOutcome,
   PipelineStep,
 } from '../domain/types'
+import { normalizeIdentifiedEntity } from '../domain/normalizeEntity'
 import { scanBarcodeFromImage } from './barcode'
 import { runOcr } from './ocr'
 import { identifyFromImage } from './vision'
@@ -14,7 +15,7 @@ function withCapturedPhoto(
   entity: IdentifiedEntity,
   capturedPhoto: string,
 ): IdentifiedEntity {
-  return { ...entity, capturedPhoto }
+  return normalizeIdentifiedEntity({ ...entity, capturedPhoto })
 }
 
 /**

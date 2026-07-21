@@ -74,19 +74,20 @@ export async function withEnrichedImages(
   entity: IdentifiedEntity,
   opts?: { barcode?: string; signal?: AbortSignal },
 ): Promise<IdentifiedEntity> {
+  const existing = entity.images ?? []
   // Already well-stocked (e.g. server identify + OFF) — skip extra round-trip
-  if (entity.images.length >= 3) {
-    return entity
+  if (existing.length >= 3) {
+    return { ...entity, images: existing }
   }
-  const name = entity.name.value ?? 'Unknown'
+  const name = entity.name?.value ?? 'Unknown'
   const images = await enrichEntityImages(
     {
       kind: entity.kind,
       name,
-      tags: entity.tags,
+      tags: entity.tags ?? [],
       imageQuery: entity.imageQuery ?? name,
       barcode: opts?.barcode,
-      existing: entity.images,
+      existing,
     },
     opts?.signal,
   )
