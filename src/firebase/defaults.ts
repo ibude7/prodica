@@ -1,13 +1,16 @@
 /** Shared Firebase web defaults for client + docs (public client config). */
 export const FIREBASE_DEFAULTS = {
-  apiKey: 'AIzaSyBKkViZD1Ic9zcA-Dk6FkjvS6mvLBV8NGU',
-  authDomain: 'prodica-app.firebaseapp.com',
-  projectId: 'prodica-app',
-  storageBucket: 'prodica-app.firebasestorage.app',
-  messagingSenderId: '476669738755',
-  appId: '1:476669738755:web:e23b7d2717954a434b3336',
-  measurementId: '',
+  apiKey: 'AIzaSyBNjUOJ1rndoimtdzG6BKZ30val-8AiDZ4',
+  authDomain: 'prodica1.firebaseapp.com',
+  projectId: 'prodica1',
+  storageBucket: 'prodica1.firebasestorage.app',
+  messagingSenderId: '257310785255',
+  appId: '1:257310785255:web:26a620256f4bb70d38ec42',
+  measurementId: 'G-6JY2FCJG3Z',
 } as const
 
-/** Gemini Developer API model (works for new Google AI projects) */
-export const DEFAULT_GEMINI_MODEL = 'gemini-3.5-flash'
+/** Vertex AI Gemini model used by Firebase AI Logic + server fallback */
+export const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash'
+
+/** Vertex AI region for Firebase AI Logic + server */
+export const DEFAULT_VERTEX_LOCATION = 'us-central1'

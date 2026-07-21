@@ -46,8 +46,10 @@ export function initFirebaseAppCheck(): Promise<AppCheck | null> {
               'App Check → your web app ⋮ → Manage debug tokens.',
           )
         } else {
-          console.error(
-            '[App Check] Missing VITE_FIREBASE_APPCHECK_SITE_KEY — Firebase AI will fail with 401.',
+          // Enforcement can be OFF for firebaseml; skip App Check rather than hard-fail AI.
+          console.warn(
+            '[App Check] No VITE_FIREBASE_APPCHECK_SITE_KEY — skipping App Check init. ' +
+              'Add a reCAPTCHA site key for production abuse protection.',
           )
           return null
         }

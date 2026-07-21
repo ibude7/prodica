@@ -44,9 +44,33 @@ async function identifyViaServer(
   }
 }
 
+async function identifyViaFirebase(
+  imageBlob: Blob,
+  hints: IdentifyHints,
+): Promise<{
+  entity: IdentifiedEntity | null
+  error?: string
+}> {
+  try {
+    const entity = await identifyWithFirebaseAi({
+      imageBlob,
+      ocrText: hints.ocrText,
+      barcode: hints.barcode,
+    })
+    return { entity }
+  } catch (e) {
+    return {
+      entity: null,
+      error: e instanceof Error ? e.message : 'Firebase AI identify failed',
+    }
+  }
+}
+
 /**
- * Visual identify: Firebase AI Logic (Gemini Developer API) first,
- * then Render `/v1/identify` as fallback.
+ * Visual identify.
+ * - Production (Vercel/Render): server Vertex first (reliable with ADC on Render),
+ *   then Firebase Vertex AI.
+ * - Dev: Firebase first (App Check debug), then local API.
  */
 export async function identifyFromImage(
   imageBlob: Blob,
@@ -56,42 +80,64 @@ export async function identifyFromImage(
   step: PipelineStep
   error?: string
 }> {
-  try {
-    const entity = await identifyWithFirebaseAi({
-      imageBlob,
-      ocrText: hints.ocrText,
-      barcode: hints.barcode,
-    })
-    return {
-      entity,
-      step: {
-        step: 'visual',
-        outcome: `Firebase AI identified as ${entity.kind}: ${entity.name.value ?? 'unknown'}`,
-      },
-    }
-  } catch (firebaseErr) {
-    const firebaseMessage =
-      firebaseErr instanceof Error
-        ? firebaseErr.message
-        : 'Firebase AI identify failed'
+  const serverFirst = import.meta.env.PROD
 
+  if (serverFirst) {
     const server = await identifyViaServer(imageBlob, hints)
     if (server.entity) {
       return {
         entity: server.entity,
         step: {
           step: 'visual',
-          outcome: `Server fallback identified as ${server.entity.kind}: ${server.entity.name.value ?? 'unknown'} (Firebase: ${firebaseMessage})`,
+          outcome: `Server identified as ${server.entity.kind}: ${server.entity.name.value ?? 'unknown'}`,
         },
       }
     }
-
-    const message = `${firebaseMessage}${server.error ? ` · Server: ${server.error}` : ''}`
+    const firebase = await identifyViaFirebase(imageBlob, hints)
+    if (firebase.entity) {
+      return {
+        entity: firebase.entity,
+        step: {
+          step: 'visual',
+          outcome: `Firebase AI identified as ${firebase.entity.kind}: ${firebase.entity.name.value ?? 'unknown'} (server: ${server.error ?? 'failed'})`,
+        },
+      }
+    }
+    const message = `AI: ${firebase.error ?? 'failed'}${server.error ? ` · Server: ${server.error}` : ''}`
     return {
       entity: null,
       error: message,
       step: { step: 'visual', outcome: message },
     }
+  }
+
+  const firebase = await identifyViaFirebase(imageBlob, hints)
+  if (firebase.entity) {
+    return {
+      entity: firebase.entity,
+      step: {
+        step: 'visual',
+        outcome: `Firebase AI identified as ${firebase.entity.kind}: ${firebase.entity.name.value ?? 'unknown'}`,
+      },
+    }
+  }
+
+  const server = await identifyViaServer(imageBlob, hints)
+  if (server.entity) {
+    return {
+      entity: server.entity,
+      step: {
+        step: 'visual',
+        outcome: `Server fallback identified as ${server.entity.kind}: ${server.entity.name.value ?? 'unknown'} (Firebase: ${firebase.error ?? 'failed'})`,
+      },
+    }
+  }
+
+  const message = `AI: ${firebase.error ?? 'failed'}${server.error ? ` · Server: ${server.error}` : ''}`
+  return {
+    entity: null,
+    error: message,
+    step: { step: 'visual', outcome: message },
   }
 }
 

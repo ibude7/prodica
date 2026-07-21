@@ -41,8 +41,9 @@ export function EntityResultView(props: {
             <li>Center the subject and improve lighting.</li>
             <li>For packaged goods, include the barcode or clear product name.</li>
             <li>
-              Enable Firebase AI Logic (Gemini Developer API) for project prodica1,
-              or set GEMINI_API_KEY on the Render API.
+              Vision uses Vertex AI on prodica1 (billing required). Locally run
+              `gcloud auth login`, or set GOOGLE_APPLICATION_CREDENTIALS on the
+              API server.
             </li>
           </ul>
           <button type="button" className="btn btn--primary" onClick={props.onRetake}>

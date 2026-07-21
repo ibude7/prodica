@@ -11,12 +11,14 @@ import {
   lookupOpenFoodFactsByBarcode,
   searchOpenFoodFactsByText,
 } from '../src/services/openFoodFacts'
+import { ensureGoogleApplicationCredentials } from './googleCredentials'
 import { identifyWithVision } from './identifyWithVision'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const rootDir = path.join(__dirname, '..')
 dotenv.config({ path: path.join(rootDir, '.env') })
 dotenv.config({ path: path.join(rootDir, '.env.local'), override: true })
+ensureGoogleApplicationCredentials()
 
 const PORT = Number(process.env.PORT ?? 3030)
 const isProd = process.env.NODE_ENV === 'production'

@@ -1,15 +1,23 @@
 import { createHash } from 'node:crypto'
+import { execFileSync } from 'node:child_process'
 
 import { createGoogleGenerativeAI } from '@ai-sdk/google'
-import { generateText, Output, type LanguageModel } from 'ai'
+import { createVertex } from '@ai-sdk/google-vertex'
+import { generateText, type LanguageModel } from 'ai'
+import { OAuth2Client } from 'google-auth-library'
 
+import { coerceLlmPayload } from '../src/domain/coerceLlm'
 import {
   identifiedEntityLlmSchema,
   type IdentifiedEntityLlm,
 } from '../src/domain/entitySchema'
 import { llmToIdentifiedEntity } from '../src/domain/intelligence'
 import type { IdentifiedEntity, ScanSource } from '../src/domain/types'
-import { DEFAULT_GEMINI_MODEL } from '../src/firebase/defaults'
+import {
+  DEFAULT_GEMINI_MODEL,
+  DEFAULT_VERTEX_LOCATION,
+  FIREBASE_DEFAULTS,
+} from '../src/firebase/defaults'
 
 const SYSTEM_PROMPT = `You are Prodica, a universal visual identification system.
 Given a photo (and optional OCR/barcode hints), identify the primary subject.
@@ -24,12 +32,9 @@ Rules:
 - id should be a short slug like "vision-<kind>-<short-name>".
 - summary: 1–3 sentences useful to a curious user.
 - tags: short searchable labels.
-- warnings: safety, legal age, allergen, or uncertainty flags when relevant.`
+- warnings: safety, legal age, allergen, or uncertainty flags when relevant.
+- Return one JSON object only (no markdown).`
 
-/**
- * Server-only Gemini keys. Do NOT use the Firebase web key here — HTTP
- * referrer restrictions block server calls (empty referer).
- */
 function geminiApiKey(): string | undefined {
   return (
     process.env.GOOGLE_GENERATIVE_AI_API_KEY ||
@@ -39,15 +44,85 @@ function geminiApiKey(): string | undefined {
   )
 }
 
+function vertexProject(): string {
+  return (
+    process.env.GOOGLE_CLOUD_PROJECT?.trim() ||
+    process.env.GOOGLE_VERTEX_PROJECT?.trim() ||
+    process.env.GCLOUD_PROJECT?.trim() ||
+    process.env.VITE_FIREBASE_PROJECT_ID?.trim() ||
+    FIREBASE_DEFAULTS.projectId
+  )
+}
+
+function vertexLocation(): string {
+  return (
+    process.env.GOOGLE_CLOUD_LOCATION?.trim() ||
+    process.env.GOOGLE_VERTEX_LOCATION?.trim() ||
+    process.env.VITE_FIREBASE_VERTEX_LOCATION?.trim() ||
+    DEFAULT_VERTEX_LOCATION
+  )
+}
+
+function modelId(): string {
+  return (
+    process.env.GEMINI_MODEL?.trim() ||
+    process.env.VITE_FIREBASE_AI_MODEL?.trim() ||
+    DEFAULT_GEMINI_MODEL
+  )
+}
+
+/** Prefer gcloud user ADC when org policy blocks service-account keys. */
+function gcloudAccessToken(): string {
+  return execFileSync('gcloud', ['auth', 'print-access-token'], {
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+  }).trim()
+}
+
+function vertexAuthOptions() {
+  if (
+    process.env.GOOGLE_APPLICATION_CREDENTIALS ||
+    process.env.GOOGLE_CLIENT_EMAIL ||
+    process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON ||
+    process.env.GOOGLE_SERVICE_ACCOUNT_JSON
+  ) {
+    // ADC / SA JSON (file path or written by ensureGoogleApplicationCredentials)
+    return undefined
+  }
+
+  // Local only: mint tokens via logged-in gcloud CLI (not available on Render).
+  try {
+    gcloudAccessToken()
+  } catch {
+    return undefined
+  }
+  const client = new OAuth2Client()
+  client.getAccessToken = async () => ({ token: gcloudAccessToken() })
+  return { authClient: client }
+}
+
+/**
+ * Prefer Vertex AI (billing-enabled). Falls back to Gemini Developer API key,
+ * then Vercel AI Gateway.
+ */
 function resolveModel(): LanguageModel {
+  const useVertex =
+    process.env.VERTEX_AI !== '0' &&
+    process.env.GEMINI_PROVIDER?.trim() !== 'google-ai'
+
+  if (useVertex) {
+    const vertex = createVertex({
+      project: vertexProject(),
+      location: vertexLocation(),
+      googleAuthOptions: vertexAuthOptions(),
+    })
+    return vertex(modelId())
+  }
+
   const geminiKey = geminiApiKey()
   if (geminiKey) {
     const google = createGoogleGenerativeAI({ apiKey: geminiKey })
-    return google(
-      process.env.GEMINI_MODEL?.trim() ||
-        process.env.VITE_FIREBASE_AI_MODEL?.trim() ||
-        DEFAULT_GEMINI_MODEL,
-    )
+    return google(modelId())
   }
 
   if (process.env.AI_GATEWAY_API_KEY || process.env.VERCEL_OIDC_TOKEN) {
@@ -55,7 +130,7 @@ function resolveModel(): LanguageModel {
   }
 
   throw new Error(
-    'No server vision key. Browser Firebase AI should handle identify; for API fallback set GEMINI_API_KEY (no HTTP-referrer restriction) or AI_GATEWAY_API_KEY.',
+    'No server vision backend. Use Vertex (gcloud auth login / GOOGLE_APPLICATION_CREDENTIALS) or set GEMINI_API_KEY / AI_GATEWAY_API_KEY.',
   )
 }
 
@@ -68,7 +143,7 @@ export async function identifyWithVision(input: {
   const model = resolveModel()
 
   const hintParts: string[] = [
-    'Identify the primary subject in this image and return structured data.',
+    'Identify the primary subject in this image and return structured JSON matching the Prodica entity schema (kind, name, summary, confidence, tags, warnings, scanNotes, facets).',
   ]
   if (input.barcode) {
     hintParts.push(`Barcode hint (may be unrelated if misread): ${input.barcode}`)
@@ -80,7 +155,6 @@ export async function identifyWithVision(input: {
 
   const result = await generateText({
     model,
-    output: Output.object({ schema: identifiedEntityLlmSchema }),
     system: SYSTEM_PROMPT,
     messages: [
       {
@@ -93,12 +167,28 @@ export async function identifyWithVision(input: {
     ],
   })
 
-  const raw = result.output
-  if (!raw) {
+  const text = result.text?.trim()
+  if (!text) {
     throw new Error('Model returned no structured identification.')
   }
 
-  const normalized = ensureId(raw, input.imageBuffer)
+  let parsed: unknown
+  try {
+    const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/)
+    parsed = JSON.parse(fenced?.[1]?.trim() || text)
+  } catch {
+    throw new Error('Model returned non-JSON identification.')
+  }
+
+  const coerced = coerceLlmPayload(parsed)
+  const validated = identifiedEntityLlmSchema.safeParse(coerced)
+  if (!validated.success) {
+    throw new Error(
+      `Identification failed schema: ${validated.error.issues[0]?.message ?? 'invalid'}`,
+    )
+  }
+
+  const normalized = ensureId(validated.data, input.imageBuffer)
   const source: ScanSource =
     input.barcode || input.ocrText?.trim() ? 'combined' : 'visual'
   return llmToIdentifiedEntity(normalized, source)

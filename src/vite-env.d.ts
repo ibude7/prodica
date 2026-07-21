@@ -10,6 +10,8 @@ interface ImportMetaEnv {
   readonly VITE_FIREBASE_APP_ID?: string
   readonly VITE_FIREBASE_MEASUREMENT_ID?: string
   readonly VITE_FIREBASE_AI_MODEL?: string
+  /** Vertex AI region for Firebase AI Logic (default us-central1) */
+  readonly VITE_FIREBASE_VERTEX_LOCATION?: string
   /** reCAPTCHA site key from Firebase Console → App Check → Web app */
   readonly VITE_FIREBASE_APPCHECK_SITE_KEY?: string
   /** `enterprise` for ReCaptchaEnterpriseProvider; default is reCAPTCHA v3 */

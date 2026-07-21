@@ -1,16 +1,17 @@
 import {
   getAI,
   getGenerativeModel,
-  GoogleAIBackend,
   Schema,
+  VertexAIBackend,
 } from 'firebase/ai'
 
+import { coerceLlmPayload } from '../domain/coerceLlm'
 import { ENTITY_KINDS, identifiedEntityLlmSchema } from '../domain/entitySchema'
 import { llmToIdentifiedEntity } from '../domain/intelligence'
 import type { IdentifiedEntity, ScanSource } from '../domain/types'
 import { getFirebaseApp } from './app'
 import { initFirebaseAppCheck } from './appCheck'
-import { DEFAULT_GEMINI_MODEL } from './defaults'
+import { DEFAULT_GEMINI_MODEL, DEFAULT_VERTEX_LOCATION } from './defaults'
 
 const SYSTEM_PROMPT = `You are Prodica, a universal visual identification system.
 Given a photo (and optional OCR/barcode hints), identify the primary subject.
@@ -272,247 +273,6 @@ async function blobToInlinePart(blob: Blob): Promise<{
   }
 }
 
-function emptyFacetsForKind(kind: (typeof ENTITY_KINDS)[number]): Record<string, unknown> {
-  // Minimal valid facet shells for Zod discriminated union when the model omits fields
-  const arr = () => []
-  switch (kind) {
-    case 'food':
-      return {
-        ingredients: null,
-        allergens: arr(),
-        nutritionFacts: arr(),
-        contents: null,
-        origin: null,
-        storage: null,
-        pairings: arr(),
-        doNotPair: arr(),
-      }
-    case 'alcohol':
-      return {
-        abv: null,
-        style: null,
-        region: null,
-        grapesOrGrains: null,
-        tastingNotes: arr(),
-        pairings: arr(),
-        servingTemp: null,
-        contents: null,
-        origin: null,
-        ingredients: null,
-      }
-    case 'medicine':
-      return {
-        activeIngredients: arr(),
-        dosage: null,
-        contraindications: arr(),
-        sideEffects: arr(),
-        storage: null,
-        form: null,
-        contents: null,
-      }
-    case 'supplement':
-      return {
-        activeIngredients: arr(),
-        dosage: null,
-        benefits: arr(),
-        warnings: arr(),
-        contents: null,
-      }
-    case 'cosmetic':
-      return {
-        ingredients: null,
-        skinTypes: arr(),
-        usage: null,
-        claims: arr(),
-        contents: null,
-      }
-    case 'household':
-      return {
-        useCase: null,
-        ingredients: null,
-        surfaces: arr(),
-        safetyNotes: arr(),
-        contents: null,
-      }
-    case 'book':
-      return {
-        authors: arr(),
-        isbn: null,
-        publisher: null,
-        year: null,
-        genre: arr(),
-        pages: null,
-        synopsis: null,
-        themes: arr(),
-      }
-    case 'movie':
-      return {
-        year: null,
-        directors: arr(),
-        cast: arr(),
-        genre: arr(),
-        runtimeMinutes: null,
-        synopsis: null,
-        whereKnownFor: null,
-      }
-    case 'tv_show':
-      return {
-        year: null,
-        creators: arr(),
-        cast: arr(),
-        genre: arr(),
-        seasons: null,
-        synopsis: null,
-        whereKnownFor: null,
-      }
-    case 'song':
-      return {
-        artists: arr(),
-        album: null,
-        year: null,
-        genre: arr(),
-        duration: null,
-        label: null,
-        notableFor: null,
-      }
-    case 'game':
-      return {
-        platforms: arr(),
-        developers: arr(),
-        publishers: arr(),
-        year: null,
-        genre: arr(),
-        synopsis: null,
-      }
-    case 'automobile':
-      return {
-        make: null,
-        model: null,
-        year: null,
-        bodyStyle: null,
-        powertrain: null,
-        notableSpecs: arr(),
-      }
-    case 'furniture':
-      return {
-        type: null,
-        materials: arr(),
-        style: null,
-        era: null,
-        dimensionsEstimate: null,
-        care: null,
-      }
-    case 'electronics':
-      return {
-        brand: null,
-        model: null,
-        category: null,
-        keySpecs: arr(),
-        connectivity: arr(),
-      }
-    case 'clothing':
-      return {
-        garmentType: null,
-        materials: arr(),
-        style: null,
-        sizeEstimate: null,
-        care: null,
-        brand: null,
-      }
-    case 'pet':
-      return {
-        species: null,
-        breedEstimate: null,
-        traits: arr(),
-        careBasics: arr(),
-        ageEstimate: null,
-      }
-    case 'animal':
-      return {
-        species: null,
-        commonName: null,
-        habitat: null,
-        traits: arr(),
-        conservationStatus: null,
-      }
-    case 'plant':
-      return {
-        commonName: null,
-        scientificName: null,
-        careBasics: arr(),
-        lightNeeds: null,
-        toxicityNotes: null,
-      }
-    case 'artwork':
-      return {
-        artist: null,
-        medium: null,
-        year: null,
-        style: null,
-        subject: null,
-        significance: null,
-      }
-    case 'landmark':
-      return {
-        location: null,
-        country: null,
-        builtOrOpened: null,
-        significance: null,
-        visitorTips: arr(),
-      }
-    case 'person':
-      return {
-        knownFor: arr(),
-        occupation: null,
-        nationality: null,
-        lifespan: null,
-        notableWorks: arr(),
-      }
-    case 'sex_position':
-      return {
-        commonNames: arr(),
-        difficulty: null,
-        description: null,
-        tips: arr(),
-        safetyNotes: arr(),
-      }
-    case 'other':
-    default:
-      return {
-        categoryGuess: null,
-        attributes: arr(),
-        relatedTopics: arr(),
-        howToLearnMore: null,
-      }
-  }
-}
-
-function coerceLlmPayload(raw: unknown): unknown {
-  if (!raw || typeof raw !== 'object') return raw
-  const o = raw as Record<string, unknown>
-  const kind =
-    typeof o.kind === 'string' && (ENTITY_KINDS as readonly string[]).includes(o.kind)
-      ? (o.kind as (typeof ENTITY_KINDS)[number])
-      : 'other'
-  const baseFacets = emptyFacetsForKind(kind)
-  const facets =
-    o.facets && typeof o.facets === 'object'
-      ? { ...baseFacets, ...(o.facets as Record<string, unknown>) }
-      : baseFacets
-  return {
-    id: typeof o.id === 'string' && o.id.trim() ? o.id : `vision-${kind}-fb`,
-    kind,
-    name: typeof o.name === 'string' ? o.name : 'Unknown',
-    subtitle: o.subtitle ?? null,
-    summary: typeof o.summary === 'string' ? o.summary : '',
-    confidence: typeof o.confidence === 'number' ? o.confidence : 0.5,
-    tags: Array.isArray(o.tags) ? o.tags : [],
-    warnings: Array.isArray(o.warnings) ? o.warnings : [],
-    scanNotes: o.scanNotes ?? null,
-    facets,
-  }
-}
-
 export async function identifyWithFirebaseAi(input: {
   imageBlob: Blob
   ocrText?: string
@@ -520,8 +280,11 @@ export async function identifyWithFirebaseAi(input: {
 }): Promise<IdentifiedEntity> {
   await initFirebaseAppCheck()
 
+  const location =
+    import.meta.env.VITE_FIREBASE_VERTEX_LOCATION?.trim() ||
+    DEFAULT_VERTEX_LOCATION
   const ai = getAI(getFirebaseApp(), {
-    backend: new GoogleAIBackend(),
+    backend: new VertexAIBackend(location),
     // Required when Firebase enforces App Check replay protection for AI Logic
     useLimitedUseAppCheckTokens: true,
   })
