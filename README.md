@@ -53,7 +53,14 @@ npm run dev       # Vite only
 | `GEMINI_MODEL` | server (optional) | Gemini model id (default `gemini-2.5-flash`) |
 | `AI_GATEWAY_API_KEY` | server | Alternative to Gemini via Vercel AI Gateway |
 | `PORT` | server | API port (default `3030`) |
-| `VITE_API_BASE` | client (optional) | Absolute API origin if not using the Vite proxy / same-origin deploy |
+| `VITE_API_BASE` | client (optional) | Absolute API origin; on `*.vercel.app` defaults to `https://prodica.onrender.com` |
+
+### Split deploy (Vercel UI + Render API)
+
+- Static app: [prodica.vercel.app](https://prodica.vercel.app)  
+- API: [prodica.onrender.com](https://prodica.onrender.com)  
+
+Add **`GEMINI_API_KEY`** in the Render dashboard (Environment). Without it, `/v1/identify` returns 503.
 
 ## Production
 

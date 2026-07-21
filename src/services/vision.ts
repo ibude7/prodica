@@ -1,19 +1,9 @@
+import { apiUrl } from '../api/apiBase'
 import type { IdentifiedEntity, PipelineStep } from '../domain/types'
 
 export interface IdentifyHints {
   ocrText?: string
   barcode?: string
-}
-
-function resolveIdentifyUrl(): string {
-  const base = import.meta.env.VITE_API_BASE
-  if (typeof base === 'string' && base.length > 0) {
-    return `${base.replace(/\/$/, '')}/v1/identify`
-  }
-  if (import.meta.env.DEV) {
-    return '/api/v1/identify'
-  }
-  return '/v1/identify'
 }
 
 /**
@@ -27,7 +17,7 @@ export async function identifyFromImage(
   step: PipelineStep
   error?: string
 }> {
-  const url = resolveIdentifyUrl()
+  const url = apiUrl('/v1/identify')
   const form = new FormData()
   form.append('image', imageBlob, 'capture.jpg')
   if (hints.ocrText?.trim()) form.append('ocrText', hints.ocrText.trim())
@@ -61,7 +51,7 @@ export async function identifyFromImage(
     const message =
       e instanceof Error
         ? e.message
-        : 'Visual identify unavailable — is the API running with AI_GATEWAY_API_KEY?'
+        : 'Visual identify unavailable — is the API running with GEMINI_API_KEY?'
     return {
       entity: null,
       error: message,

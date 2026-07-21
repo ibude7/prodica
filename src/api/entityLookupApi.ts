@@ -3,17 +3,7 @@ import {
   lookupOpenFoodFactsByBarcode,
   searchOpenFoodFactsByText,
 } from '../services/openFoodFacts'
-
-function resolveLookupUrl(): string {
-  const base = import.meta.env.VITE_API_BASE
-  if (typeof base === 'string' && base.length > 0) {
-    return `${base.replace(/\/$/, '')}/v1/entities/lookup`
-  }
-  if (import.meta.env.DEV) {
-    return '/api/v1/entities/lookup'
-  }
-  return '/v1/entities/lookup'
-}
+import { apiUrl } from './apiBase'
 
 async function lookupFromOpenFoodFacts(
   request: LookupRequest,
@@ -34,7 +24,7 @@ async function lookupFromOpenFoodFacts(
 export async function fetchEntityLookup(
   request: LookupRequest,
 ): Promise<IdentifiedEntity | null> {
-  const url = resolveLookupUrl()
+  const url = apiUrl('/v1/entities/lookup')
   try {
     const res = await fetch(url, {
       method: 'POST',

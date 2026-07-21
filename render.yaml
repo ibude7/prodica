@@ -13,3 +13,6 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
+      # Set in Render Dashboard → Environment (sync: false = prompt / manual)
+      - key: GEMINI_API_KEY
+        sync: false
